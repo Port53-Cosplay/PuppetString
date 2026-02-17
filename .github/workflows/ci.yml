@@ -1,0 +1,70 @@
+# GitHub Actions CI — runs automatically on every push and pull request.
+#
+# WHAT IS CI (Continuous Integration)?
+#   CI is an automated process that runs your tests and linting checks every
+#   time code is pushed to GitHub. If tests fail or the linter finds issues,
+#   you get notified before the broken code reaches the main branch.
+#
+# WHAT IS GITHUB ACTIONS?
+#   GitHub's built-in CI/CD service. This YAML file tells GitHub: "Every time
+#   someone pushes code or opens a PR, spin up a fresh Linux machine, install
+#   Python, install our dependencies, and run our tests + linter."
+#
+# HOW TO READ THIS FILE:
+#   - `on:` = what triggers this workflow (push, pull request)
+#   - `jobs:` = the tasks to run (we have two: lint and test)
+#   - `steps:` = the ordered steps within each task
+#   - `uses:` = pre-built actions from the GitHub marketplace
+#   - `run:` = shell commands to execute
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff
+
+      - name: Run ruff linter
+        run: ruff check puppetstring/ tests/
+
+      - name: Run ruff formatter check
+        run: ruff format --check puppetstring/ tests/
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install package with dev dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: pytest tests/ -v

@@ -8,6 +8,102 @@ PuppetString is an open-source Python red team toolkit for testing the security 
 - **GitHub:** https://github.com/Port53-Cosplay/PuppetString
 - **Local path:** <project-root>
 
+## CLI Command Names (MANDATORY — Read This First)
+
+PuppetString uses themed command names based on a puppet metaphor. **These are the ONLY command names allowed.** Do NOT use generic alternatives under any circumstances.
+
+| Command | What It Does | Metaphor |
+|---|---|---|
+| `puppetstring pull` | MCP scanning + workflow fuzzing | Pulling the strings |
+| `puppetstring tangle` | Indirect prompt injection testing | Tangling up the agent's inputs |
+| `puppetstring cut` | Agent-to-agent attacks | Cutting the strings of trust |
+| `puppetstring dance` | Full OWASP audit | Making the whole system dance |
+| `puppetstring unravel` | Report generation (HTML/JSON/Markdown) | Unraveling what went wrong |
+| `puppetstring stage` | Deploy/teardown vulnerable test targets | Setting the stage |
+
+### NEVER use these generic names — they are WRONG:
+
+- ~~`scan`~~ → use `pull --type scan`
+- ~~`fuzz`~~ → use `pull --type [tool-abuse|memory-poison|boundary|chain|all]`
+- ~~`inject`~~ → use `tangle`
+- ~~`swarm`~~ → use `cut`
+- ~~`audit`~~ → use `dance`
+- ~~`report`~~ → use `unravel`
+- ~~`setup`~~ / ~~`deploy`~~ / ~~`init`~~ → use `stage`
+
+### Module directories stay descriptive (these are internal, not user-facing):
+
+- `puppetstring/modules/mcp_scanner/` — used by `pull --type scan`
+- `puppetstring/modules/workflow_fuzzer/` — used by `pull --type [fuzz types]`
+- `puppetstring/modules/prompt_injection/` — used by `tangle`
+- `puppetstring/modules/agent_swarm/` — used by `cut`
+- `puppetstring/modules/owasp_audit/` — used by `dance`
+- `puppetstring/reporting/` — used by `unravel`
+- `puppetstring/staging/` — used by `stage`
+
+## Glossary — Key Concepts in Plain English
+
+If you're new to this space, here's what the jargon means. This section exists
+so that anyone picking up this project can understand what we're building and why.
+
+### What is an "AI Agent"?
+
+A regular chatbot just talks — you ask it something, it answers. An **AI agent**
+can *do things*. It has tools: it can read files, search the web, send emails,
+query databases, run code. Think of it as an AI with hands, not just a mouth.
+That's powerful, but it's also dangerous — because now an attacker doesn't just
+trick an AI into *saying* something bad, they can trick it into *doing* something bad.
+
+### What is MCP (Model Context Protocol)?
+
+**MCP** is like a USB port for AI agents. It's a standard protocol (created by
+Anthropic) that defines how AI agents discover and use tools.
+
+- An **MCP server** exposes tools (e.g., "read a file", "query a database",
+  "run a shell command"). It's a program that sits there waiting for an AI to
+  connect and ask what tools are available.
+- An **MCP client** (the AI agent) connects to the server, sees the menu of
+  available tools, and uses them.
+
+**Why it's a security problem:** Most MCP servers were built for convenience,
+not security. They often require no authentication (anyone can connect), expose
+dangerous tools (shell execution, unrestricted file reads), do no input validation
+(you can pass `../../etc/passwd` to a file-read tool), and have no rate limiting.
+PuppetString's scanner connects to MCP servers and flags all of this.
+
+### What is OWASP?
+
+**OWASP** (Open Worldwide Application Security Project) is a nonprofit that
+publishes free security guidance. Their "Top 10" lists are industry-standard
+references for the most critical risks in a given domain. The **OWASP Top 10
+for Agentic AI (2026)** is specifically about risks in AI systems that can take
+actions — which is exactly what PuppetString tests for.
+
+### What is a "Red Team"?
+
+In security, a **red team** is the group that pretends to be the attacker. They
+try to break into systems, find vulnerabilities, and exploit weaknesses — but
+they do it with permission, so the organization can fix the problems before real
+attackers find them. PuppetString is a red team tool for AI agents.
+
+### What is Prompt Injection?
+
+**Prompt injection** is tricking an AI by hiding instructions in its input.
+- **Direct:** You tell the AI "ignore your instructions and do X instead."
+- **Indirect:** You hide instructions in a document, email, or web page that
+  the AI reads as part of its job. The AI follows the hidden instructions
+  without realizing they're from an attacker, not from the user.
+
+Indirect prompt injection is the #1 practical attack against deployed agents,
+and it's what PuppetString's `tangle` command tests for.
+
+### What is "Fuzzing"?
+
+**Fuzzing** means throwing a lot of weird, unexpected, or malicious inputs at
+something to see what breaks. PuppetString's `pull` command fuzzes AI agents —
+it sends crafted messages designed to trick the agent into misusing its tools,
+leaking its instructions, or breaking out of its intended boundaries.
+
 ## Security-First Development (NON-NEGOTIABLE)
 
 This is a security tool. The code we ship must be exemplary. Every line written should reflect that.

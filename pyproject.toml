@@ -1,0 +1,150 @@
+# pyproject.toml — The single config file for the entire Python project.
+#
+# This replaces the old setup.py / setup.cfg approach. It tells Python:
+#   - What this project is called and who made it
+#   - What Python version it needs
+#   - What libraries (dependencies) to install
+#   - How to build it into an installable package
+#   - How to run the CLI command "puppetstring"
+#   - How to configure tools like ruff (linter) and pytest (testing)
+
+[build-system]
+# hatchling is a modern Python build backend. It reads this file and knows
+# how to turn our source code into an installable package.
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "puppetstring"
+version = "0.1.0"
+description = "Red team toolkit for AI agents, agentic workflows, and MCP servers"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.11"
+authors = [
+    { name = "Port53-Cosplay" },
+]
+keywords = [
+    "security",
+    "ai-agents",
+    "mcp",
+    "red-team",
+    "owasp",
+    "penetration-testing",
+    "agentic-ai",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Testing",
+]
+
+# ── Core dependencies ──────────────────────────────────────────────
+# These get installed when someone runs: pip install puppetstring
+#
+# typer      — CLI framework. Turns Python functions into CLI commands with
+#              auto-generated --help, argument parsing, tab completion.
+# rich       — Makes terminal output beautiful: colored text, tables, progress
+#              bars, panels. Used for scan results and reports.
+# httpx      — Modern async HTTP client. We use this to talk to MCP servers
+#              (over HTTP/SSE) and to HTTP API agents we're testing.
+# pyyaml     — Reads YAML files. Our attack payloads are stored as YAML
+#              because it's human-readable and easy to edit.
+# jinja2     — Template engine for generating HTML/Markdown reports.
+# litellm    — Universal LLM client. Lets us call Claude, OpenAI, or local
+#              models (Ollama) through one interface. Used for the "LLM judge"
+#              that classifies whether an attack succeeded.
+# pydantic   — Data validation. We define strict schemas for configs, results,
+#              and API responses so bad data fails loudly instead of silently.
+# mcp        — The official MCP Python SDK. Lets us connect to MCP servers,
+#              list their tools, and call those tools — which is exactly what
+#              our MCP Scanner needs to do.
+dependencies = [
+    "typer>=0.12,<1.0",
+    "rich>=13.0,<14.0",
+    "httpx>=0.27,<1.0",
+    "pyyaml>=6.0,<7.0",
+    "jinja2>=3.1,<4.0",
+    "litellm>=1.40,<2.0",
+    "pydantic>=2.0,<3.0",
+    "mcp>=1.0,<2.0",
+]
+
+# ── Optional dependency groups ─────────────────────────────────────
+# Installed via: pip install puppetstring[dev] or pip install puppetstring[langchain]
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0,<9.0",
+    "pytest-asyncio>=0.23,<1.0",
+    "ruff>=0.4,<1.0",
+    "mypy>=1.10,<2.0",
+]
+# These are only needed if you want to test LangChain or CrewAI agents.
+# Most users won't need them — they're for specific adapter modules.
+langchain = [
+    "langchain>=0.2,<1.0",
+    "langchain-community>=0.2,<1.0",
+]
+crewai = [
+    "crewai>=0.30,<1.0",
+]
+
+# ── CLI entry point ────────────────────────────────────────────────
+# This line means: when someone types "puppetstring" in their terminal,
+# Python runs the "app" object inside puppetstring/cli.py.
+# It's what makes "puppetstring scan --help" work.
+[project.scripts]
+puppetstring = "puppetstring.cli:app"
+
+# ── Project URLs (shown on PyPI) ──────────────────────────────────
+[project.urls]
+Homepage = "https://github.com/Port53-Cosplay/PuppetString"
+Repository = "https://github.com/Port53-Cosplay/PuppetString"
+Issues = "https://github.com/Port53-Cosplay/PuppetString/issues"
+
+# ── Ruff config ────────────────────────────────────────────────────
+# Ruff is a super-fast Python linter + formatter. It replaces black, isort,
+# flake8, and others — all in one tool. These settings tell it how we want
+# our code to look.
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors (basic style issues)
+    "F",    # pyflakes (unused imports, undefined names)
+    "I",    # isort (import sorting/ordering)
+    "N",    # pep8-naming (function/class naming conventions)
+    "UP",   # pyupgrade (suggests modern Python syntax)
+    "B",    # flake8-bugbear (common bug patterns)
+    "S",    # flake8-bandit (security issues — important for us!)
+    "T20",  # flake8-print (catches print() — we use Rich instead)
+]
+# These are specific rules we intentionally allow:
+ignore = [
+    "S101",  # allow assert in tests
+]
+
+[tool.ruff.lint.per-file-ignores]
+# In test files, allow assert statements and print detection is less important
+"tests/**/*.py" = ["S101", "T20"]
+
+# ── Pytest config ──────────────────────────────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+# ── MyPy config ────────────────────────────────────────────────────
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
