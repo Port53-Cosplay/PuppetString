@@ -4,6 +4,28 @@
 
 ---
 
+## 0. Project Status & Session Log
+
+**GitHub:** https://github.com/Port53-Cosplay/PuppetString
+**GitHub username:** Port53-Cosplay
+**Old repo (Closet-App):** Archived
+
+### Session 1 — 2026-02-16
+
+**What got done:**
+- Installed GitHub CLI (`gh`) and authenticated
+- Archived old Closet-App repo
+- Renamed project from AgentStrike to PuppetString (folder, file, all references)
+- Initialized git repo, created .gitignore
+- Created GitHub repo and pushed initial commit (d60c748)
+- Git credential helper configured (`gh auth setup-git`) so `git push` just works
+- Added network share as safe directory for git
+
+**Next session — pick up with:**
+- Phase 0 scaffolding: pyproject.toml, directory structure, CLI skeleton, README, LICENSE
+
+---
+
 ## 1. Vision & Elevator Pitch
 
 PuppetString is an open-source, Python-based red team toolkit for testing the security of AI agents, agentic workflows, and Model Context Protocol (MCP) servers. It helps security teams answer the question: **"What happens when someone tries to trick, abuse, or weaponize our AI agents?"**
@@ -925,7 +947,7 @@ company_name = ""                    # For branded reports
 
 **Goal:** Repo is set up, dependencies are configured, basic CLI works.
 
-- [ ] Initialize git repo with README, LICENSE (MIT), .gitignore
+- [x] Initialize git repo with .gitignore (README and LICENSE still needed)
 - [ ] Set up pyproject.toml with all dependencies
 - [ ] Create directory structure (all the `__init__.py` files, module directories)
 - [ ] Implement basic CLI skeleton with Typer (all subcommands defined, `--help` works)
