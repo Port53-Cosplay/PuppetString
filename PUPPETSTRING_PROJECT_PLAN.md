@@ -53,6 +53,38 @@
 **Next session — pick up with:**
 - Phase 1: MCP Scanner — start with the MCP adapter (SSE + stdio transport)
 
+### Session 3 — 2026-02-17 (evening)
+
+**What got done:**
+- Implemented full Phase 1 MCP Scanner:
+  - MCP adapter with SSE and stdio transport support (auto-detects from URL scheme)
+  - Tool enumeration with dangerous capability detection (name, description, schema pattern matching)
+  - Authentication audit (transport-aware — skips false positives on stdio)
+  - Permission classification (code-execution, destructive, read-write, read-only)
+  - Input validation probing (path traversal, SQL injection, oversized inputs)
+  - Server configuration checks (TLS, logging capabilities)
+  - Rich terminal reporter with color-coded findings and OWASP mapping
+  - Pydantic data models (ToolInfo, Finding, ScanResult)
+  - Intentionally vulnerable MCP test server in examples/
+  - 35 passing tests with MockMCPAdapter
+- Tested successfully against real Home Assistant MCP server via mcp-proxy stdio bridge
+- Ran security review on all Phase 1 code — found and fixed 4 issues:
+  - Credential leakage in log output (added URL sanitization)
+  - stdio:// path parsing fragility (switched to shlex.split)
+  - Missing --type CLI validation (added explicit type checking)
+  - False positive auth finding on stdio transport (made transport-aware)
+- Added `workflow` scope to GitHub OAuth token for CI pushes
+- Committed and pushed Phase 1 (cdfe119)
+
+**Next session — pick up with:**
+- Phase 2: Workflow Fuzzer — implement `pull --type tool-abuse` and other fuzz types
+  - HTTP adapter for talking to AI agents
+  - YAML payload library (tool abuse, memory poisoning, boundary testing, chain exploitation)
+  - LLM judge pattern for classifying attack results
+  - Fuzzing orchestration loop
+  - Vulnerable LangChain agent test target
+- HTML report generation (`unravel`) deferred to Phase 5
+
 ---
 
 ## 1. Vision & Elevator Pitch
@@ -1062,16 +1094,18 @@ company_name = ""
 
 **Goal:** `puppetstring pull --type scan` works against any MCP server and produces a security report.
 
-- [ ] Implement MCP adapter (SSE + stdio transport)
-- [ ] Tool enumeration via `tools/list`
-- [ ] Dangerous capability flagging (file access, code execution, network, DB)
-- [ ] Authentication check (can we connect without auth?)
-- [ ] Input validation testing (type confusion, path traversal, injection)
-- [ ] Permission analysis (LLM-powered reasoning about tool capabilities)
-- [ ] Terminal output with Rich tables
-- [ ] Build the vulnerable MCP server test target (`puppetstring stage --target vulnerable-mcp`)
-- [ ] Write tests against the vulnerable MCP server
-- [ ] Generate first HTML report via `puppetstring unravel`
+- [x] Implement MCP adapter (SSE + stdio transport)
+- [x] Tool enumeration via `tools/list`
+- [x] Dangerous capability flagging (file access, code execution, network, DB)
+- [x] Authentication check (can we connect without auth?)
+- [x] Input validation testing (type confusion, path traversal, injection)
+- [x] Permission analysis (keyword-based classification — LLM-powered deferred to Phase 2)
+- [x] Terminal output with Rich tables
+- [x] Build the vulnerable MCP server test target (in `examples/vulnerable_mcp_server/`)
+- [x] Write tests (35 passing — models, checks, scanner, CLI, reporter)
+- [ ] ~~Generate first HTML report via `puppetstring unravel`~~ (moved to Phase 5)
+- [x] Tested against real Home Assistant MCP server via stdio proxy
+- [x] Security review passed (4 issues found and fixed)
 
 **Definition of done:** Run `puppetstring pull --target mcp://localhost:3000 --type scan` against the vulnerable server and get a clean, accurate report with findings mapped to OWASP categories.
 
