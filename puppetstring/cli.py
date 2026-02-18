@@ -9,11 +9,14 @@ Commands use a puppet metaphor:
     stage    — Set the stage: deploy/teardown vulnerable test targets
 """
 
+import asyncio
+
 import typer
 from rich.console import Console
 from rich.panel import Panel
 
 from puppetstring import __version__
+from puppetstring.modules.mcp_scanner.scanner import MCP_SCAN_TYPES
 
 # ── App setup ──────────────────────────────────────────────────────
 # Typer() creates the root CLI app. Each function decorated with
@@ -86,14 +89,16 @@ def _responsible_use_callback(value: bool) -> None:
 # The callback= on the Typer app lets us define them.
 @app.callback()
 def main(
-    version: bool | None = typer.Option(        None,
+    version: bool | None = typer.Option(
+        None,
         "--version",
         "-v",
         help="Show version and exit.",
         callback=_version_callback,
         is_eager=True,
     ),
-    responsible_use: bool | None = typer.Option(        None,
+    responsible_use: bool | None = typer.Option(
+        None,
         "--responsible-use",
         help="Show the responsible use policy and exit.",
         callback=_responsible_use_callback,
@@ -125,7 +130,8 @@ def pull(
             "For workflow fuzzing: tool-abuse, memory-poison, boundary, chain, all."
         ),
     ),
-    payloads: str | None = typer.Option(        None,
+    payloads: str | None = typer.Option(
+        None,
         "--payloads",
         "-p",
         help="Path to a custom YAML payloads file.",
@@ -152,7 +158,44 @@ def pull(
     _show_banner()
     console.print(f"\n[bold]Target:[/bold] {target}")
     console.print(f"[bold]Type:[/bold] {scan_type}")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 1.[/yellow]")
+
+    _VALID_FUZZ_TYPES = {"tool-abuse", "memory-poison", "boundary", "chain"}
+    _ALL_VALID_TYPES = MCP_SCAN_TYPES | _VALID_FUZZ_TYPES | {"all"}
+
+    if scan_type not in _ALL_VALID_TYPES:
+        console.print(
+            f"\n[bold red]Unknown scan type:[/bold red] '{scan_type}'\n"
+            f"[bold]Valid types:[/bold] {', '.join(sorted(_ALL_VALID_TYPES))}"
+        )
+        raise typer.Exit(code=1)
+
+    if scan_type in MCP_SCAN_TYPES:
+        # MCP scanning — Phase 1
+        from puppetstring.config import load_config  # noqa: PLC0415
+        from puppetstring.modules.mcp_scanner.scanner import MCPScanner  # noqa: PLC0415
+        from puppetstring.reporting.terminal import render_scan_result  # noqa: PLC0415
+        from puppetstring.utils.logging import setup_logging  # noqa: PLC0415
+
+        setup_logging(verbose=False)
+        config = load_config()
+        scanner = MCPScanner(target=target, scan_config=config.scan)
+
+        try:
+            result = asyncio.run(scanner.run(scan_type=scan_type))
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Scan interrupted by user.[/yellow]")
+            raise typer.Exit(code=1) from None
+
+        if output == "terminal":
+            render_scan_result(result)
+        else:
+            console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+
+        if result.error:
+            raise typer.Exit(code=1)
+    else:
+        # Workflow fuzzing — Phase 2
+        console.print("\n[yellow]Fuzzing not implemented yet — coming in Phase 2.[/yellow]")
 
 
 @app.command()
@@ -168,12 +211,14 @@ def tangle(
         "--vector",
         help="Injection vector: document, tool-output, database, all.",
     ),
-    goal: str | None = typer.Option(        None,
+    goal: str | None = typer.Option(
+        None,
         "--goal",
         "-g",
         help='What the injection should achieve (e.g., "exfiltrate the system prompt").',
     ),
-    document: str | None = typer.Option(        None,
+    document: str | None = typer.Option(
+        None,
         "--document",
         "-d",
         help="Path to a document to inject into (for --vector document).",

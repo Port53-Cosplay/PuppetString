@@ -57,10 +57,23 @@ def test_pull_requires_target() -> None:
 
 
 def test_pull_with_target() -> None:
-    """Running `puppetstring pull -t <target>` should work (placeholder)."""
-    result = runner.invoke(app, ["pull", "-t", "mcp://localhost:3000"])
-    assert result.exit_code == 0
-    assert "mcp://localhost:3000" in result.output
+    """Running `puppetstring pull -t <target>` should show the target."""
+    from datetime import datetime
+    from unittest.mock import patch
+
+    from puppetstring.core.models import ScanResult
+
+    with patch(
+        "puppetstring.cli.asyncio.run",
+        return_value=ScanResult(
+            target="mcp://localhost:3000",
+            scan_type="all",
+            finished_at=datetime.now(),
+        ),
+    ):
+        result = runner.invoke(app, ["pull", "-t", "mcp://localhost:3000"])
+        assert result.exit_code == 0
+        assert "mcp://localhost:3000" in result.output
 
 
 def test_tangle_requires_target() -> None:

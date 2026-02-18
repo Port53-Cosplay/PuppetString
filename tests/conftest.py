@@ -19,9 +19,16 @@ WHAT IS conftest.py?
 import pytest
 
 from puppetstring.config import PuppetStringConfig
+from puppetstring.core.models import ScanResult
 
 
 @pytest.fixture
 def default_config() -> PuppetStringConfig:
     """Provide a default PuppetString configuration for tests."""
     return PuppetStringConfig()
+
+
+@pytest.fixture
+def scan_result() -> ScanResult:
+    """Provide an empty ScanResult for tests."""
+    return ScanResult(target="mcp://localhost:3000", scan_type="scan")
