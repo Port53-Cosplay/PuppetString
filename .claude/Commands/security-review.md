@@ -1,4 +1,6 @@
-Review all recently changed files for security issues. Check for:
+**Before reviewing code, run the environment health check.** Read `scripts/health_check.py` and verify: (a) the editable install location makes sense (not pointing to a deleted directory), (b) all core modules listed in the script are importable, (c) the CLI entry point resolves. If anything looks wrong, flag it to the user immediately. Do NOT skip this step.
+
+Then review all recently changed files for security issues. Check for:
 
 1. Shell injection (subprocess with shell=True, unsanitized inputs to commands)
 2. Path traversal (unvalidated file paths, missing .resolve() checks)

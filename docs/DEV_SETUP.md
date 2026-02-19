@@ -17,12 +17,11 @@ you install for this project. It keeps PuppetString's dependencies separate
 from other Python projects on your machine. It's not a virtual machine — just
 an isolated folder.
 
-### Why is the venv on C: instead of Y:?
+### Why is the venv separate from the project?
 
-Python's venv tool creates symlinks (shortcuts), and Windows doesn't allow
-symlinks on network shares (Y: drive). So the venv lives on the local C: drive
-while the actual code lives on Y:. This is totally fine — you just need to
-activate the venv before working.
+Python's venv tool creates symlinks (shortcuts), and some environments don't
+support them (e.g., network shares). The venv lives on the local C: drive
+alongside the project. You just need to activate the venv before working.
 
 ### What is PATH?
 
@@ -118,16 +117,13 @@ The venv isn't activated. See step 3 above.
 You probably have 32-bit Python or a very new Python version (3.14+). Make
 sure you have the **64-bit** Python 3.13 installer from python.org.
 
-### "Access denied" when creating venv on Y: drive
-The venv can't live on the network share. Create it on C: instead (step 2).
-
-### Tests show a "PytestCacheWarning" about Y: drive
-Harmless. pytest can't write its cache to the network share. Tests still pass.
+### "Access denied" when creating venv on a network share
+The venv can't live on a network share. Create it on a local drive instead (step 2).
 
 ## Project Structure (Quick Reference)
 
 ```
-<project-root>\          ← Code lives here (network share)
+<project-root>\          ← Code lives here (local drive)
 C:\Users\<username>\.venvs\puppetstring\  ← Venv lives here (local drive)
 
 puppetstring/                ← The actual Python package

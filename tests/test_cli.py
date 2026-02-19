@@ -76,9 +76,19 @@ def test_pull_with_target() -> None:
         assert "mcp://localhost:3000" in result.output
 
 
-def test_tangle_requires_target() -> None:
-    """Running `puppetstring tangle` without --target should fail."""
-    result = runner.invoke(app, ["tangle"])
+def test_tangle_document_mode_no_target() -> None:
+    """Running `puppetstring tangle` without --target enters document generation mode."""
+    from unittest.mock import patch  # noqa: PLC0415
+
+    with patch("puppetstring.cli.asyncio.run"):
+        result = runner.invoke(app, ["tangle", "--vector", "document"])
+        assert result.exit_code == 0
+        assert "Document generation" in result.output
+
+
+def test_tangle_invalid_vector() -> None:
+    """Running `puppetstring tangle` with an invalid vector should fail."""
+    result = runner.invoke(app, ["tangle", "--vector", "invalid"])
     assert result.exit_code != 0
 
 

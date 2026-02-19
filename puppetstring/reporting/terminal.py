@@ -21,6 +21,10 @@ from puppetstring.core.models import (
     ScanResult,
     Severity,
 )
+from puppetstring.modules.prompt_injection.models import (
+    InjectionClassification,
+    TangleRunResult,
+)
 
 console = Console()
 
@@ -345,6 +349,213 @@ def _render_fuzz_summary(result: FuzzRunResult) -> None:
         Panel(
             "\n".join(summary_lines),
             title="[bold]Fuzz Summary[/bold]",
+            border_style="red" if has_exploits else "green",
+            expand=False,
+        )
+    )
+    console.print()
+
+
+# ── Tangle result rendering ──────────────────────────────────────
+
+_INJECTION_STYLES: dict[str, str] = {
+    "exploited": "bold red",
+    "partial": "yellow",
+    "blocked": "green",
+    "error": "dim",
+}
+
+
+def render_tangle_result(result: TangleRunResult) -> None:
+    """Print a full tangle (injection) report to the terminal."""
+    _render_tangle_header(result)
+
+    if result.error:
+        console.print(f"\n[bold red]Tangle error:[/bold red] {result.error}\n")
+        return
+
+    if result.documents:
+        _render_tangle_documents_table(result)
+
+    if result.results:
+        _render_tangle_results_table(result)
+        _render_tangle_exploited_details(result)
+
+    _render_tangle_summary(result)
+
+
+def _render_tangle_header(result: TangleRunResult) -> None:
+    """Print the tangle header panel."""
+    console.print()
+    lines = [
+        f"[bold]Target:[/bold] {result.target}",
+        f"[bold]Vector:[/bold] {result.vector}",
+    ]
+    if result.goal:
+        lines.append(f"[bold]Goal:[/bold] {result.goal}")
+    lines.append(f"[bold]Started:[/bold] {result.started_at:%Y-%m-%d %H:%M:%S}")
+
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="[bold magenta]PuppetString — Tangling the inputs...[/bold magenta]",
+            border_style="magenta",
+            expand=False,
+        )
+    )
+
+
+def _render_tangle_documents_table(result: TangleRunResult) -> None:
+    """Print the generated documents table."""
+    table = Table(
+        title=f"\n[bold]Generated Poisoned Documents ({len(result.documents)})[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Format", width=10)
+    table.add_column("Technique", max_width=25)
+    table.add_column("File", max_width=50)
+
+    for i, doc in enumerate(result.documents, 1):
+        table.add_row(
+            str(i),
+            doc.format.value.upper(),
+            doc.technique.value,
+            str(doc.file_path) if doc.file_path else "[dim]not saved[/dim]",
+        )
+
+    console.print(table)
+
+
+def _render_tangle_results_table(result: TangleRunResult) -> None:
+    """Print the injection results table — one row per payload."""
+    table = Table(
+        title=f"\n[bold]Injection Results ({len(result.results)})[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Result", width=10)
+    table.add_column("Severity", width=10)
+    table.add_column("Payload", max_width=35)
+    table.add_column("Category", width=14)
+    table.add_column("Technique", max_width=20)
+    table.add_column("OWASP", width=10)
+
+    for i, r in enumerate(result.results, 1):
+        cls_style = _INJECTION_STYLES.get(r.classification.value, "")
+        sev_style = _SEVERITY_STYLES.get(r.severity.value, "")
+        owasp = ", ".join(r.owasp_ids) if r.owasp_ids else "-"
+        technique = r.technique.value if r.technique else "-"
+
+        table.add_row(
+            str(i),
+            Text(r.classification.value.upper(), style=cls_style),
+            Text(r.severity.value.upper(), style=sev_style),
+            r.payload_name,
+            r.payload_category,
+            technique,
+            owasp,
+        )
+
+    console.print(table)
+
+
+def _render_tangle_exploited_details(result: TangleRunResult) -> None:
+    """Print expanded details for exploited and partial injection results."""
+    notable = [
+        r
+        for r in result.results
+        if r.classification
+        in (
+            InjectionClassification.EXPLOITED,
+            InjectionClassification.PARTIAL,
+        )
+    ]
+
+    if not notable:
+        return
+
+    for r in notable:
+        cls_style = _INJECTION_STYLES.get(r.classification.value, "")
+        border = "red" if r.classification == InjectionClassification.EXPLOITED else "yellow"
+
+        lines = [
+            f"[{cls_style}]{r.classification.value.upper()}[/{cls_style}] {r.payload_name}",
+            f"\n[bold]Goal:[/bold] {r.goal}",
+            f"\n[bold]Hidden text:[/bold] {r.hidden_text[:150]}",
+        ]
+
+        if r.trigger_query:
+            lines.append(f"\n[bold]Trigger:[/bold] {r.trigger_query}")
+
+        if r.response and r.response.text:
+            preview = r.response.text[:200]
+            if len(r.response.text) > 200:
+                preview += "..."
+            lines.append(f"\n[bold]Agent response:[/bold] {preview}")
+
+        lines.append(f"\n[bold]Judge:[/bold] {r.explanation}")
+
+        console.print(
+            Panel(
+                "\n".join(lines),
+                border_style=border,
+                expand=False,
+            )
+        )
+
+
+def _render_tangle_summary(result: TangleRunResult) -> None:
+    """Print the tangle summary panel."""
+    summary_lines = []
+
+    if result.documents:
+        summary_lines.extend(
+            [
+                f"[bold]Documents generated:[/bold] {len(result.documents)}",
+                "",
+            ]
+        )
+
+    if result.results:
+        total = len(result.results)
+        summary_lines.extend(
+            [
+                f"[bold]Total injections:[/bold] {total}",
+                "",
+                f"  [bold red]Exploited:[/bold red] {result.exploited_count}",
+                f"  [yellow]Partial:[/yellow] {result.partial_count}",
+                f"  [green]Blocked:[/green] {result.blocked_count}",
+                f"  [dim]Error:[/dim] {result.error_count}",
+            ]
+        )
+
+        if total > 0:
+            exploit_rate = result.exploited_count / total * 100
+            summary_lines.extend(
+                [
+                    "",
+                    f"[bold]Exploitation rate:[/bold] {exploit_rate:.0f}%",
+                ]
+            )
+
+    summary_lines.extend(
+        [
+            "",
+            f"[bold]Duration:[/bold] {result.duration_seconds:.1f}s",
+        ]
+    )
+
+    has_exploits = result.exploited_count > 0
+    console.print()
+    console.print(
+        Panel(
+            "\n".join(summary_lines),
+            title="[bold]Tangle Summary[/bold]",
             border_style="red" if has_exploits else "green",
             expand=False,
         )

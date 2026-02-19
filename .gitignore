@@ -43,5 +43,6 @@ htmlcov/
 # ruff
 .ruff_cache/
 
-# Claude Code local settings
+# Claude Code local settings (machine-specific, never push)
 .claude/settings.local.json
+.claude/local_env.md

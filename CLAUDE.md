@@ -11,7 +11,8 @@ PuppetString is an open-source Python red team toolkit for testing the security 
 
 These details get lost when conversation context is compacted. Re-read this section.
 
-- **Python venv:** On local drive (not in repo) because network shares block symlinks. See `docs/DEV_SETUP.md` for exact paths.
+- **Machine-specific paths (venv, project root):** Read `.claude/local_env.md` — it's gitignored and has exact paths for this dev machine. **Always read that file after compaction.**
+- **Generic setup guide:** `docs/DEV_SETUP.md` (for anyone cloning the repo fresh).
 - **Activate venv before running anything.** If pytest or another tool isn't found, the venv probably isn't activated — tell the user, don't try to fix it.
 - **The user runs commands themselves** in their own terminal. Do NOT try to `pip install` packages without asking first.
 - **Running tests:** `python -m pytest tests/ -x -q` (from the project root, with venv activated).
@@ -167,6 +168,29 @@ Ask yourself: "If someone audited this code at a security conference, would it h
 - **Commits:** Descriptive messages, commit at meaningful milestones
 - **Pushes:** Infrequent — batch up work and push when ready. Don't push automatically.
 - **Never commit:** `.env` files, API keys, `puppetstring_results/` output, `__pycache__`
+
+## Environment Verification (AFTER ANY INSTALL OR MIGRATION)
+
+If the venv is recreated, the project moves to a new directory, or `pip install -e .` is re-run, verify the environment is healthy before doing anything else. Broken wiring causes subtle failures that are hard to diagnose later.
+
+### Quick check (run in the activated venv):
+
+```bash
+python scripts/health_check.py
+```
+
+This verifies: venv is active, editable install resolves to the correct source directory, all modules import, CLI entry point works. If any check fails, fix it before continuing.
+
+### What to verify manually after migration:
+
+1. **Venv activation** — `which python` (or `Get-Command python` on PowerShell) should point to the venv, not system Python.
+2. **Editable install location** — `pip show puppetstring` should show `Location:` pointing to the project source directory, not a stale or deleted path.
+3. **Smoke tests pass** — `python -m pytest tests/test_smoke.py -v` runs import checks for every module. If anything fails, the install is broken.
+4. **Full test suite** — `python -m pytest tests/ -x -q` should pass.
+
+### When the `end-session` or `security-review` skills are invoked:
+
+Claude Code will run the health check automatically and flag any failures before continuing. This catches environment drift between sessions.
 
 ## Testing Requirements
 

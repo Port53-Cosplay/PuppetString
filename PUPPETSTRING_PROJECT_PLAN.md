@@ -151,6 +151,59 @@
 **Next session — pick up with:**
 - Phase 3: Indirect Prompt Injection (`puppetstring tangle`)
 
+### Session 6 — 2026-02-18 (late evening) + 2026-02-19
+
+**What got done:**
+- Implemented full Phase 3 Indirect Prompt Injection module (`puppetstring tangle`):
+  - Pydantic models: `InjectionPayload`, `GeneratedDocument`, `InjectionResult`, `TangleRunResult`, plus enums for vectors, techniques, goals, formats, classifications
+  - `UnicodeEncoder` class: zero-width char encoding, tag characters (U+E0001-E007F), homoglyph substitution (Cyrillic/Greek), invisible separator injection — all with roundtrip encode/decode
+  - `DocumentGenerator`: generates poisoned SVG, HTML, Markdown files with multiple steganographic techniques per format (invisible text, metadata, comments, white text, zero-width encoding, etc.)
+  - `InjectionJudge`: LLM-powered classification with canary detection fast-path and heuristic fallback
+  - `TangleEngine`: orchestrator with document generation mode (no target needed) and live testing mode (tests running agents via tool output injection)
+  - 3 YAML payload files: document injection (15 payloads), tool output injection (12 payloads), encoding bypasses (8 payloads)
+  - YAML `payload_loader.py` for loading/filtering injection payloads
+  - CLI wiring: `puppetstring tangle --vector document --goal "BANANA" --format svg,html` works
+  - Rich terminal reporter: `render_tangle_result()` with documents table, results table, exploited details, summary
+  - Vulnerable agent `/v1/inject` endpoint for tool output override testing
+  - `fpdf2` optional dependency for PDF generation
+  - 74 new tests in `test_tangle.py` — all passing
+  - Updated `test_cli.py` for new optional --target behavior
+  - Total: 211+ tests passing, all ruff checks clean
+- Fixed 2 real bugs found by tests:
+  - Separator encoding delimiter conflicted with data characters (removed delimiter, each byte is always exactly 4 chars)
+  - `_vector_to_categories("nonexistent")` returned None (loaded all payloads instead of none) — fixed to return `[]`
+- Migrated project from Y: drive (network share) to C:\Users\lurka\Projects\PuppetString (local drive):
+  - Re-pointed editable install to C: drive
+  - Synced all files to C: (Y: had some files, C: had others — consolidated)
+  - Created `.claude/local_env.md` (gitignored) for machine-specific paths
+  - Updated CLAUDE.md to reference local_env.md after compaction
+  - Updated docs/DEV_SETUP.md to remove Y: drive references
+  - Y: drive copy is now fully defunct
+- Built environment safeguards after the broken pip install incident:
+  - `scripts/health_check.py`: verifies venv, editable install location, all module imports, CLI entry point
+  - `tests/test_smoke.py`: 25 pytest tests that catch import/wiring failures automatically
+  - Updated CLAUDE.md with "Environment Verification" section
+  - Updated `end-session` and `security-review` skills to run health check first
+  - Created `.claude/local_env.md` (gitignored) for machine-specific paths that survive compaction
+- Demo: uploaded poisoned SVG to ChatGPT — it correctly detected and rejected the hidden injection (BLOCKED result). Need to try subtler techniques and different AI targets.
+
+**Design decisions:**
+- Two tangle modes: document generation (offline, works with any AI) and live testing (automated against a running target)
+- Canary-based fast detection ("BANANA" in response = EXPLOITED) avoids needing LLM judge for obvious cases
+- Separator encoding doesn't need delimiters because each byte is always exactly 4 base-4 digits
+- Machine-specific paths go in `.claude/local_env.md` (gitignored), not CLAUDE.md (committed)
+
+**Environment notes:**
+- Project root is now C:\Users\lurka\Projects\PuppetString (NOT Y: drive)
+- Y:\DeAnna\PuppetString is DEFUNCT — safe to delete
+- Claude Code should be launched from C:\Users\lurka\Projects\PuppetString
+
+**Next session — pick up with:**
+- Improve payload sophistication: replace obvious "ignore previous instructions" with realistic attacker techniques (authority impersonation, task wrapping, subtle goal manipulation)
+- Add image steganography support to tangle: accept an existing image, inject EXIF metadata, XMP data, IPTC captions, and steganographic text overlays
+- Update Phase 3 checklist items
+- Phase 4 planning if Phase 3 improvements are quick
+
 ---
 
 ## 1. Vision & Elevator Pitch
@@ -1199,13 +1252,15 @@ company_name = ""
 
 **Goal:** `puppetstring tangle` tests whether agents are vulnerable to data-source-based attacks.
 
-- [ ] Implement document injection generator (create test PDFs, HTML with hidden instructions)
-- [ ] Implement tool output interception (mock tool responses with adversarial content)
-- [ ] Implement encoding variant generator (Unicode, homoglyphs, invisible characters)
+- [x] Implement document injection generator (SVG, HTML, Markdown with hidden instructions)
+- [x] Implement tool output interception (POST /v1/inject on vulnerable agent for overrides)
+- [x] Implement encoding variant generator (Unicode zero-width, tag chars, homoglyphs, invisible separators)
+- [ ] Implement image steganography (EXIF metadata, XMP, IPTC, overlay injection on existing images)
+- [ ] Improve payload sophistication (replace obvious injections with realistic attacker techniques)
 - [ ] Implement LLM-powered dynamic payload generation
 - [ ] Implement goal-based testing (specify desired outcome, tool generates payloads)
-- [ ] Build test fixtures
-- [ ] Write tests
+- [x] Build test fixtures (conftest.py fixtures + MockInjectionJudge + TangleTestAgent)
+- [x] Write tests (74 tests in test_tangle.py + 25 smoke tests)
 
 **Definition of done:** Run `puppetstring tangle --target http://localhost:8000 --vector document --goal "exfiltrate the system prompt"` and get a report showing which injection techniques succeeded.
 
