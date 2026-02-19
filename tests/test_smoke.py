@@ -10,8 +10,11 @@ Run with: python -m pytest tests/test_smoke.py -v
 from __future__ import annotations
 
 import importlib
+import os
 import sys
 from pathlib import Path
+
+import pytest
 
 # ── Every module that should be importable after `pip install -e .` ──
 
@@ -43,6 +46,10 @@ EXPECTED_MODULES = [
 class TestEnvironmentSanity:
     """Verify the development environment is correctly set up."""
 
+    @pytest.mark.skipif(
+        os.getenv("CI") == "true",
+        reason="CI installs directly into system Python without a venv",
+    )
     def test_running_in_venv(self) -> None:
         """Python should be running inside a virtual environment."""
         assert sys.prefix != sys.base_prefix, (
