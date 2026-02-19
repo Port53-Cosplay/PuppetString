@@ -204,6 +204,39 @@
 - Update Phase 3 checklist items
 - Phase 4 planning if Phase 3 improvements are quick
 
+### Session 7 — 2026-02-19
+
+**What got done:**
+- Completed all 4 remaining Phase 3 checklist items:
+  1. **Payload sophistication:** Rewrote all 35 payloads across 3 YAML files, replacing obvious markers (IMPORTANT:, SYSTEM:, OVERRIDE:) with realistic social-engineering techniques — authority impersonation, diagnostic framing, compliance urgency, task wrapping, fake error recovery, sandwich technique
+  2. **Image steganography:** Added IMAGE format + 4 encoding techniques (EXIF, XMP, overlay, IPTC) with Pillow as optional dependency. Generates poisoned PNG bar charts with hidden adversarial metadata
+  3. **Goal-based testing:** GoalType enum (10 types) + ParsedGoal with structured prefix parsing ("canary:BANANA", "exfil:system-prompt", "tool-abuse:file-read") and keyword heuristic fallback for freeform goals. Smart tag-based payload filtering in payload_loader. Goal-aware judge heuristics (system-prompt exfil detection with 7 indicators, dangerous tool detection, API key pattern matching with 5 regexes)
+  4. **Dynamic payload generation:** PayloadGenerator class using LiteLLM to generate tailored payloads. Carefully crafted system prompt forbids obvious markers. JSON response parsing with graceful fallback. Engine integration with generate_dynamic flag, CLI wiring
+- Added 4 new image payloads to document_injection.yaml (EXIF canary, XMP exfil, overlay tool-abuse, IPTC override)
+- Updated __init__.py exports (GoalType, ParsedGoal, PayloadGenerator)
+- Updated test_smoke.py with payload_generator import test
+- Added ~30 new tests across 6 test classes (image generation, ParsedGoal, smart goal filtering, PayloadGenerator parsing, goal-aware judge heuristics, engine dynamic flag)
+- 271 tests passing, 6 skipped (Pillow image tests), ruff clean
+- Committed and pushed all work including prior-session leftovers (vulnerable agent, config, reporter, health check)
+- **Phase 3 is 100% complete**
+
+**Next session — pick up with:**
+- Phase 4: Agent-to-Agent Simulator (`puppetstring cut`)
+
+### Session 8 — 2026-02-19 (brief)
+
+**What got done:**
+- Reviewed Phase 4 architecture and attack categories in detail (trust exploitation, shared memory attacks, delegation abuse, rogue agent injection)
+- Discussed employability strategy: GitHub profile README, repo presentation, LinkedIn presence
+- No code changes this session — planning and orientation only
+
+**Next session — pick up with:**
+- Phase 4: Agent-to-Agent Simulator (`puppetstring cut`)
+  - Start with CrewAI adapter (most popular multi-agent framework)
+  - Begin with two-agent scenarios before scaling to full swarms
+  - Key metric: "Did Agent A successfully cause Agent B to take an action Agent B shouldn't have taken?"
+- Create GitHub profile README (Port53-Cosplay/Port53-Cosplay repo)
+
 ---
 
 ## 1. Vision & Elevator Pitch
@@ -1255,12 +1288,12 @@ company_name = ""
 - [x] Implement document injection generator (SVG, HTML, Markdown with hidden instructions)
 - [x] Implement tool output interception (POST /v1/inject on vulnerable agent for overrides)
 - [x] Implement encoding variant generator (Unicode zero-width, tag chars, homoglyphs, invisible separators)
-- [ ] Implement image steganography (EXIF metadata, XMP, IPTC, overlay injection on existing images)
-- [ ] Improve payload sophistication (replace obvious injections with realistic attacker techniques)
-- [ ] Implement LLM-powered dynamic payload generation
-- [ ] Implement goal-based testing (specify desired outcome, tool generates payloads)
+- [x] Implement image steganography (EXIF metadata, XMP, IPTC, overlay injection — Pillow optional dep, 4 techniques, PNG output)
+- [x] Improve payload sophistication (all 35 payloads rewritten with authority impersonation, diagnostic framing, compliance urgency, task wrapping, fake error recovery)
+- [x] Implement LLM-powered dynamic payload generation (PayloadGenerator class via LiteLLM, with JSON parsing + graceful fallback)
+- [x] Implement goal-based testing (GoalType enum, ParsedGoal with structured prefix + keyword heuristic, smart tag-based payload filtering, goal-aware judge heuristics)
 - [x] Build test fixtures (conftest.py fixtures + MockInjectionJudge + TangleTestAgent)
-- [x] Write tests (74 tests in test_tangle.py + 25 smoke tests)
+- [x] Write tests (271 total — 100+ tangle tests covering encoding, documents, images, payloads, judge, engine, goals, dynamic generation)
 
 **Definition of done:** Run `puppetstring tangle --target http://localhost:8000 --vector document --goal "exfiltrate the system prompt"` and get a report showing which injection techniques succeeded.
 
