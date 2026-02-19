@@ -95,6 +95,14 @@ langchain = [
 crewai = [
     "crewai>=0.30,<1.0",
 ]
+# PDF generation for poisoned document creation (tangle command)
+pdf = [
+    "fpdf2>=2.7,<3.0",
+]
+# Image steganography for poisoned image creation (tangle command)
+image = [
+    "Pillow>=10.0,<12.0",
+]
 
 # ── CLI entry point ────────────────────────────────────────────────
 # This line means: when someone types "puppetstring" in their terminal,

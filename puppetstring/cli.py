@@ -238,28 +238,38 @@ def pull(
 
 @app.command()
 def tangle(
-    target: str = typer.Option(
-        ...,
+    target: str | None = typer.Option(
+        None,
         "--target",
         "-t",
-        help="Target agent to test (e.g., http://localhost:8000, langchain://localhost:8000).",
+        help="Target agent to test (e.g., http://localhost:8000). Not needed for document mode.",
     ),
     vector: str = typer.Option(
-        "all",
+        "document",
         "--vector",
-        help="Injection vector: document, tool-output, database, all.",
+        help="Injection vector: document (generate files), tool-output (live test), encoding, all.",
     ),
     goal: str | None = typer.Option(
         None,
         "--goal",
         "-g",
-        help='What the injection should achieve (e.g., "exfiltrate the system prompt").',
+        help=(
+            'What the injection should achieve (e.g., "canary:BANANA", "exfiltrate system prompt").'
+        ),
     ),
-    document: str | None = typer.Option(
+    fmt: str | None = typer.Option(
         None,
-        "--document",
-        "-d",
-        help="Path to a document to inject into (for --vector document).",
+        "--format",
+        "-f",
+        help=(
+            "Document formats to generate (comma-separated): "
+            "svg, html, markdown, pdf, image. Default: svg,html,markdown."
+        ),
+    ),
+    output_dir: str | None = typer.Option(
+        None,
+        "--output-dir",
+        help="Directory for generated documents. Default: ./puppetstring_results/tangle_documents.",
     ),
     output: str = typer.Option(
         "terminal",
@@ -274,17 +284,138 @@ def tangle(
     hidden in the data sources it consumes — documents, tool outputs, databases.
 
     \b
+    Two modes:
+      DOCUMENT MODE (default, no --target needed):
+        Generate poisoned documents with hidden instructions, then manually
+        upload them to any AI (ChatGPT, Gemini, Claude) to test.
+
+      LIVE MODE (requires --target):
+        Automatically test a running agent by injecting adversarial content
+        into tool outputs and judging whether behavior changes.
+
+    \b
     Examples:
-        puppetstring tangle -t http://localhost:8000 --vector document -d ./test.pdf
-        puppetstring tangle -t mcp://localhost:3000 --vector tool-output --goal "exfiltrate data"
+        puppetstring tangle --vector document --goal "BANANA" -f svg,html
+        puppetstring tangle -t http://localhost:8000 --vector tool-output --goal "canary:BANANA"
         puppetstring tangle -t http://localhost:8000 --vector all
     """
     _show_banner()
-    console.print(f"\n[bold]Target:[/bold] {target}")
-    console.print(f"[bold]Vector:[/bold] {vector}")
-    if goal:
-        console.print(f"[bold]Goal:[/bold] {goal}")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 3.[/yellow]")
+
+    valid_vectors = {"document", "tool-output", "encoding", "all"}
+    if vector not in valid_vectors:
+        console.print(
+            f"\n[bold red]Unknown vector:[/bold red] '{vector}'\n"
+            f"[bold]Valid vectors:[/bold] {', '.join(sorted(valid_vectors))}"
+        )
+        raise typer.Exit(code=1)
+
+    from pathlib import Path  # noqa: PLC0415
+
+    from puppetstring.config import load_config  # noqa: PLC0415
+    from puppetstring.modules.prompt_injection.engine import TangleEngine  # noqa: PLC0415
+    from puppetstring.modules.prompt_injection.models import DocumentFormat  # noqa: PLC0415
+    from puppetstring.reporting.terminal import render_tangle_result  # noqa: PLC0415
+    from puppetstring.utils.logging import setup_logging  # noqa: PLC0415
+
+    setup_logging(verbose=False)
+    config = load_config()
+
+    # Determine mode: document generation or live testing
+    is_live_mode = target is not None and vector != "document"
+
+    if is_live_mode:
+        # Live mode — requires a target agent
+        from puppetstring.adapters.http_adapter import HTTPAgentAdapter  # noqa: PLC0415
+
+        console.print("\n[bold]Mode:[/bold] Live testing")
+        console.print(f"[bold]Target:[/bold] {target}")
+        console.print(f"[bold]Vector:[/bold] {vector}")
+
+        effective_goal = goal or ""
+        if effective_goal:
+            console.print(f"[bold]Goal:[/bold] {effective_goal}")
+
+        async def _run_live() -> None:
+            adapter = HTTPAgentAdapter(target=target, timeout=config.fuzz.timeout)
+            async with adapter:
+                engine = TangleEngine(
+                    adapter=adapter,
+                    judge_model=config.inject.judge_model,
+                    delay_between_injections=config.inject.delay_between_injections,
+                    max_injections=config.inject.max_injections,
+                    generate_dynamic=config.inject.generate_dynamic_payloads,
+                    generator_model=config.general.llm_model,
+                )
+                tangle_result = await engine.run_live_mode(
+                    vector=vector,
+                    goal=effective_goal,
+                )
+
+            if output == "terminal":
+                render_tangle_result(tangle_result)
+            else:
+                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+
+            if tangle_result.exploited_count > 0:
+                raise typer.Exit(code=1)
+
+        try:
+            asyncio.run(_run_live())
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Tangle run interrupted by user.[/yellow]")
+            raise typer.Exit(code=1) from None
+        except ConnectionError as exc:
+            console.print(f"\n[bold red]Connection failed:[/bold red] {exc}")
+            raise typer.Exit(code=1) from None
+
+    else:
+        # Document generation mode — no target needed
+        console.print("\n[bold]Mode:[/bold] Document generation")
+
+        effective_goal = goal or config.inject.default_goal
+        console.print(f"[bold]Goal:[/bold] {effective_goal}")
+
+        # Parse formats
+        formats: list[DocumentFormat] | None = None
+        format_str = fmt or ",".join(config.inject.default_formats)
+        if format_str:
+            format_names = [f.strip().lower() for f in format_str.split(",")]
+            formats = []
+            for name in format_names:
+                try:
+                    formats.append(DocumentFormat(name))
+                except ValueError:
+                    console.print(
+                        f"\n[bold red]Unknown format:[/bold red] '{name}'\n"
+                        f"[bold]Valid formats:[/bold] svg, html, markdown, pdf, image"
+                    )
+                    raise typer.Exit(code=1) from None
+
+        console.print(f"[bold]Formats:[/bold] {format_str}")
+
+        # Determine output directory
+        effective_output_dir = Path(output_dir or config.inject.output_dir)
+
+        async def _run_document() -> None:
+            engine = TangleEngine(
+                judge_model=config.inject.judge_model,
+            )
+            tangle_result = await engine.run_document_mode(
+                goal=effective_goal,
+                formats=formats,
+                output_dir=effective_output_dir,
+            )
+
+            if output == "terminal":
+                render_tangle_result(tangle_result)
+            else:
+                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+
+        try:
+            asyncio.run(_run_document())
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Document generation interrupted by user.[/yellow]")
+            raise typer.Exit(code=1) from None
 
 
 @app.command()
