@@ -183,10 +183,11 @@ def _sanitize_url(url: str) -> str:
     try:
         parsed = urlparse(url)
         if parsed.username or parsed.password:
-            safe = parsed._replace(netloc=f"***@{parsed.hostname}" + (f":{parsed.port}" if parsed.port else ""))
+            port_suffix = f":{parsed.port}" if parsed.port else ""
+            safe = parsed._replace(netloc=f"***@{parsed.hostname}{port_suffix}")
             return urlunparse(safe)
     except Exception:  # noqa: BLE001
-        pass
+        logger.debug("Failed to sanitize URL, returning as-is")
     return url
 
 

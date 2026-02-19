@@ -6,7 +6,20 @@ PuppetString is an open-source Python red team toolkit for testing the security 
 
 - **Full project plan:** `PUPPETSTRING_PROJECT_PLAN.md` (read this for architecture, module specs, and current status)
 - **GitHub:** https://github.com/Port53-Cosplay/PuppetString
-- **Local path:** <project-root>
+
+## Development Environment (READ THIS AFTER COMPACTION)
+
+These details get lost when conversation context is compacted. Re-read this section.
+
+- **Python venv:** On local drive (not in repo) because network shares block symlinks. See `docs/DEV_SETUP.md` for exact paths.
+- **Activate venv before running anything.** If pytest or another tool isn't found, the venv probably isn't activated — tell the user, don't try to fix it.
+- **The user runs commands themselves** in their own terminal. Do NOT try to `pip install` packages without asking first.
+- **Running tests:** `python -m pytest tests/ -x -q` (from the project root, with venv activated).
+- **Linting:** `ruff check puppetstring/ tests/` (ruff is installed in the venv).
+- **Formatting:** `ruff format puppetstring/ tests/` — CI also runs `ruff format --check`, so always run the formatter before committing or CI will fail.
+- **The user runs the vulnerable test agent** (`examples/vulnerable_agent/llm_agent.py`) manually in a separate terminal against a local Ollama instance. The default model is `llama3.1:8b`. Don't try to start/stop Ollama or the agent — the user handles that.
+- **The user runs fuzzing commands** (`puppetstring pull -t http://127.0.0.1:8000 --type tool-abuse`) in their own terminal and pastes results or points to an error file. Read the file when asked, don't try to run the commands yourself.
+- **Shell quirks:** The user's terminal is PowerShell on Windows. Curly braces in commands (like curl with JSON) cause issues — use Python scripts instead.
 
 ## CLI Command Names (MANDATORY — Read This First)
 

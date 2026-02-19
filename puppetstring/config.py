@@ -54,7 +54,7 @@ class GeneralConfig(BaseModel):
         description="LLM provider: anthropic, openai, or ollama",
     )
     llm_model: str = Field(
-        default="claude-sonnet-4-5-20250929",
+        default="claude-haiku-4-5-20251001",
         description="Model name for LLM judge and dynamic payload generation",
     )
     llm_api_key_env: str = Field(
@@ -95,6 +95,13 @@ class ScanConfig(BaseModel):
 class FuzzConfig(BaseModel):
     """Settings for the `pull --type [fuzz]` command (workflow fuzzing)."""
 
+    timeout: int = Field(
+        default=300,
+        description=(
+            "Seconds to wait per request. Local LLMs with tool-calling loops "
+            "can take 2-3 min per message — increase this for multi-turn payloads."
+        ),
+    )
     payloads_dir: str = Field(
         default="default",
         description="'default' uses built-in payloads, or specify a path",
@@ -112,7 +119,7 @@ class FuzzConfig(BaseModel):
         description="Reset the conversation between each payload",
     )
     judge_model: str = Field(
-        default="claude-sonnet-4-5-20250929",
+        default="claude-haiku-4-5-20251001",
         description="LLM model used to judge whether attacks succeeded",
     )
 

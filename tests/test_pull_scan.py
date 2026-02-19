@@ -417,11 +417,15 @@ class TestCLIPull:
             result = runner.invoke(app, ["pull", "-t", "mcp://localhost:3000", "--type", "scan"])
             assert result.exit_code == 0
 
-    def test_pull_fuzz_type_not_implemented(self) -> None:
-        """Non-MCP scan types show a 'not implemented' message."""
-        result = runner.invoke(app, ["pull", "-t", "http://localhost:8000", "--type", "tool-abuse"])
-        assert result.exit_code == 0
-        assert "not implemented" in result.output.lower()
+    def test_pull_fuzz_type_connection_failure(self) -> None:
+        """Fuzz types exit with error when agent is unreachable."""
+        result = runner.invoke(
+            app,
+            ["pull", "-t", "http://localhost:8000", "--type", "tool-abuse"],
+        )
+        # Exits 1 because the target agent isn't running
+        assert result.exit_code == 1
+        assert "connection failed" in result.output.lower()
 
     def test_pull_with_error_exits_nonzero(self) -> None:
         """If the scan has an error, exit code should be 1."""

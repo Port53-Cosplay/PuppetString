@@ -159,13 +159,13 @@ def pull(
     console.print(f"\n[bold]Target:[/bold] {target}")
     console.print(f"[bold]Type:[/bold] {scan_type}")
 
-    _VALID_FUZZ_TYPES = {"tool-abuse", "memory-poison", "boundary", "chain"}
-    _ALL_VALID_TYPES = MCP_SCAN_TYPES | _VALID_FUZZ_TYPES | {"all"}
+    valid_fuzz_types = {"tool-abuse", "memory-poison", "boundary", "chain"}
+    all_valid_types = MCP_SCAN_TYPES | valid_fuzz_types | {"all"}
 
-    if scan_type not in _ALL_VALID_TYPES:
+    if scan_type not in all_valid_types:
         console.print(
             f"\n[bold red]Unknown scan type:[/bold red] '{scan_type}'\n"
-            f"[bold]Valid types:[/bold] {', '.join(sorted(_ALL_VALID_TYPES))}"
+            f"[bold]Valid types:[/bold] {', '.join(sorted(all_valid_types))}"
         )
         raise typer.Exit(code=1)
 
@@ -195,7 +195,45 @@ def pull(
             raise typer.Exit(code=1)
     else:
         # Workflow fuzzing — Phase 2
-        console.print("\n[yellow]Fuzzing not implemented yet — coming in Phase 2.[/yellow]")
+        from pathlib import Path  # noqa: PLC0415
+
+        from puppetstring.adapters.http_adapter import HTTPAgentAdapter  # noqa: PLC0415
+        from puppetstring.config import load_config  # noqa: PLC0415
+        from puppetstring.modules.workflow_fuzzer.fuzzer import WorkflowFuzzer  # noqa: PLC0415
+        from puppetstring.reporting.terminal import render_fuzz_result  # noqa: PLC0415
+        from puppetstring.utils.logging import setup_logging  # noqa: PLC0415
+
+        setup_logging(verbose=False)
+        config = load_config()
+
+        custom_path = Path(payloads) if payloads else None
+
+        async def _run_fuzz() -> None:
+            adapter = HTTPAgentAdapter(target=target, timeout=config.fuzz.timeout)
+            async with adapter:
+                fuzzer = WorkflowFuzzer(
+                    adapter=adapter,
+                    config=config.fuzz,
+                    custom_payloads_path=custom_path,
+                )
+                fuzz_result = await fuzzer.run(fuzz_type=scan_type)
+
+            if output == "terminal":
+                render_fuzz_result(fuzz_result)
+            else:
+                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+
+            if fuzz_result.exploited_count > 0:
+                raise typer.Exit(code=1)
+
+        try:
+            asyncio.run(_run_fuzz())
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Fuzzing interrupted by user.[/yellow]")
+            raise typer.Exit(code=1) from None
+        except ConnectionError as exc:
+            console.print(f"\n[bold red]Connection failed:[/bold red] {exc}")
+            raise typer.Exit(code=1) from None
 
 
 @app.command()
