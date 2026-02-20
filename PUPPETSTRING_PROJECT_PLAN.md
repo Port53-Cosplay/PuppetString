@@ -288,9 +288,41 @@ The agentic AI attack surface is brand new. MCP security was described at Black 
 
 - Plugin system for community-contributed attack modules
 - Visual attack graph / workflow visualization (React frontend)
-- Integration with MITRE ATLAS framework
 - Support for AutoGen, Semantic Kernel, Amazon Bedrock Agents
 - Automated remediation suggestion generation via LLM
+
+#### MITRE ATLAS Integration
+
+PuppetString already covers several ATLAS techniques (see mapping below). These stretch goals add explicit ATLAS coverage and fill gaps.
+
+**Already covered by existing modules:**
+
+| ATLAS Technique | PuppetString Coverage |
+|---|---|
+| AML.T0051: Prompt Injection (direct) | `pull --type memory-poison, boundary` |
+| AML.T0051: Prompt Injection (indirect) | `tangle` |
+| AML.T0058: AI Agent Context Poisoning | `tangle --vector tool-output` + `pull --type memory-poison` |
+| AML.T0061: AI Agent Tools | `pull --type tool-abuse` + `pull --type scan` |
+| AML.T0062: Exfiltration via AI Agent Tool Invocation | `pull --type chain` (read+exfil payloads) |
+| AML.T0060: Data from AI Services | `tangle` goal-based testing (exfil:system-prompt) |
+| AML.TA0010: Discovery | `pull --type scan` (tool enumeration, capability mapping) |
+
+**Covered by Phase 4 (`cut`):**
+
+| ATLAS Technique | PuppetString Coverage |
+|---|---|
+| AML.T0058: Context Poisoning (cross-agent) | `cut` — shared memory attacks |
+| AML.T0059: Activation Triggers | `cut` — rogue agent injection |
+| AML.T0061: AI Agent Tools (delegation) | `cut` — delegation abuse |
+
+**Stretch goals to fill remaining ATLAS gaps:**
+
+- [ ] **RAG pipeline poisoning** (AML.T0020 applied to vector DBs) — new `tangle --vector rag` vector. Inject adversarial content into vector databases and test whether agents retrieve and follow it. Highest-value stretch goal; RAG is the #1 enterprise AI pattern and almost nobody is testing it.
+- [ ] **MCP tool supply chain** (LLM Plugin Compromise) — can a malicious tool definition override another tool's behavior? Deepen `pull --type scan` to test tool shadowing and definition conflicts.
+- [ ] **Persistent config manipulation** (Modify AI Agent Configuration) — test whether an agent can be tricked into altering its own config or system prompt across sessions.
+- [ ] **System prompt reconstruction** (Model Extraction) — dedicated module for systematically probing to reconstruct an agent's system prompt or fine-tuning data. Partially covered by exfil goals but deserves standalone treatment.
+- [ ] **Credential harvesting** (AML.TA0009: Credential Access) — test if agents leak API keys, tokens, or credentials from their environment. Partially covered by exfil:api-keys goal.
+- [ ] **ATLAS mapping in reports** — add ATLAS technique IDs to findings alongside OWASP mapping in `unravel` reports and the README coverage table.
 
 ---
 
