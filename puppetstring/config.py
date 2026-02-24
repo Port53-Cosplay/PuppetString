@@ -161,6 +161,31 @@ class InjectConfig(BaseModel):
     )
 
 
+class CutConfig(BaseModel):
+    """Settings for the `cut` command (agent-to-agent attacks)."""
+
+    timeout: int = Field(
+        default=300,
+        description="Seconds to wait per attack attempt",
+    )
+    max_attacks: int = Field(
+        default=50,
+        description="Maximum attack payloads to run per attack type",
+    )
+    delay_between_attacks: float = Field(
+        default=1.0,
+        description="Seconds to wait between attack attempts",
+    )
+    judge_model: str = Field(
+        default="claude-haiku-4-5-20251001",
+        description="LLM model for judging swarm attack results",
+    )
+    reset_between_attacks: bool = Field(
+        default=True,
+        description="Reset swarm state between independent attack payloads",
+    )
+
+
 class ReportConfig(BaseModel):
     """Settings for the `unravel` command (report generation)."""
 
@@ -185,6 +210,7 @@ class PuppetStringConfig(BaseModel):
     scan: ScanConfig = Field(default_factory=ScanConfig)
     fuzz: FuzzConfig = Field(default_factory=FuzzConfig)
     inject: InjectConfig = Field(default_factory=InjectConfig)
+    cut: CutConfig = Field(default_factory=CutConfig)
     report: ReportConfig = Field(default_factory=ReportConfig)
 
 

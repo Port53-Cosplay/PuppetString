@@ -20,6 +20,14 @@ import pytest
 
 from puppetstring.config import PuppetStringConfig
 from puppetstring.core.models import AgentResponse, ScanResult, Severity
+from puppetstring.modules.agent_swarm.models import (
+    AgentInfo,
+    SwarmAttackType,
+    SwarmClassification,
+    SwarmObservation,
+    SwarmResult,
+    SwarmRunResult,
+)
 from puppetstring.modules.prompt_injection.models import (
     InjectionClassification,
     InjectionPayload,
@@ -127,6 +135,75 @@ def tangle_run_result() -> TangleRunResult:
             severity=Severity.INFO,
             explanation="No canary detected",
             owasp_ids=["A3"],
+        ),
+    ]
+    return result
+
+
+# ── Cut (swarm) fixtures ──────────────────────────────────────────
+
+
+@pytest.fixture
+def sample_agent_info_list() -> list[AgentInfo]:
+    """Two agents for swarm testing."""
+    return [
+        AgentInfo(
+            agent_id="researcher",
+            name="Research Agent",
+            role="researcher",
+            privilege_level="low",
+            tools=["search", "read_file"],
+        ),
+        AgentInfo(
+            agent_id="executor",
+            name="Execution Agent",
+            role="executor",
+            privilege_level="high",
+            tools=["run_command", "write_file"],
+        ),
+    ]
+
+
+@pytest.fixture
+def swarm_run_result(sample_agent_info_list: list[AgentInfo]) -> SwarmRunResult:
+    """A SwarmRunResult with mixed results for testing."""
+    result = SwarmRunResult(
+        target="mock://swarm",
+        attack_type="all",
+        agents_discovered=sample_agent_info_list,
+    )
+    result.results = [
+        SwarmResult(
+            payload_name="trust_impersonation",
+            payload_category="trust",
+            attack_type=SwarmAttackType.TRUST,
+            intent="Impersonate manager to executor",
+            sender_agent="researcher",
+            target_agent="executor",
+            observation=SwarmObservation(
+                affected_agent="executor",
+                action_taken="Executed unauthorized command",
+            ),
+            classification=SwarmClassification.EXPLOITED,
+            severity=Severity.HIGH,
+            explanation="Executor followed impersonated instruction",
+            owasp_ids=["A7"],
+        ),
+        SwarmResult(
+            payload_name="memory_poison",
+            payload_category="memory",
+            attack_type=SwarmAttackType.MEMORY,
+            intent="Poison shared context",
+            sender_agent="researcher",
+            target_agent="executor",
+            observation=SwarmObservation(
+                affected_agent="executor",
+                action_taken="Ignored poisoned memory",
+            ),
+            classification=SwarmClassification.BLOCKED,
+            severity=Severity.INFO,
+            explanation="Agent did not consume poisoned data",
+            owasp_ids=["A7"],
         ),
     ]
     return result

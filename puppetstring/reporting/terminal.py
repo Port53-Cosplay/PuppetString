@@ -21,6 +21,10 @@ from puppetstring.core.models import (
     ScanResult,
     Severity,
 )
+from puppetstring.modules.agent_swarm.models import (
+    SwarmClassification,
+    SwarmRunResult,
+)
 from puppetstring.modules.prompt_injection.models import (
     InjectionClassification,
     TangleRunResult,
@@ -556,6 +560,205 @@ def _render_tangle_summary(result: TangleRunResult) -> None:
         Panel(
             "\n".join(summary_lines),
             title="[bold]Tangle Summary[/bold]",
+            border_style="red" if has_exploits else "green",
+            expand=False,
+        )
+    )
+    console.print()
+
+
+# ── Cut (swarm) result rendering ──────────────────────────────────
+
+_SWARM_STYLES: dict[str, str] = {
+    "exploited": "bold red",
+    "partial": "yellow",
+    "blocked": "green",
+    "error": "dim",
+}
+
+
+def render_cut_result(result: SwarmRunResult) -> None:
+    """Print a full cut (agent-to-agent) report to the terminal."""
+    _render_cut_header(result)
+
+    if result.error:
+        console.print(f"\n[bold red]Cut error:[/bold red] {result.error}\n")
+        return
+
+    if result.agents_discovered:
+        _render_cut_agents_table(result)
+
+    if result.results:
+        _render_cut_results_table(result)
+        _render_cut_exploited_details(result)
+
+    _render_cut_summary(result)
+
+
+def _render_cut_header(result: SwarmRunResult) -> None:
+    """Print the cut header panel."""
+    console.print()
+    lines = [
+        f"[bold]Target:[/bold] {result.target}",
+        f"[bold]Attack type:[/bold] {result.attack_type}",
+        f"[bold]Agents discovered:[/bold] {len(result.agents_discovered)}",
+        f"[bold]Started:[/bold] {result.started_at:%Y-%m-%d %H:%M:%S}",
+    ]
+
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="[bold magenta]PuppetString — Cutting the strings...[/bold magenta]",
+            border_style="magenta",
+            expand=False,
+        )
+    )
+
+
+def _render_cut_agents_table(result: SwarmRunResult) -> None:
+    """Print the discovered agents table."""
+    table = Table(
+        title=f"\n[bold]Discovered Agents ({len(result.agents_discovered)})[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("ID", width=15)
+    table.add_column("Name", width=20)
+    table.add_column("Role", width=15)
+    table.add_column("Privilege", width=10)
+    table.add_column("Tools", max_width=35)
+
+    for agent in result.agents_discovered:
+        tools_str = ", ".join(agent.tools) if agent.tools else "[dim]none[/dim]"
+        table.add_row(
+            agent.agent_id,
+            agent.name or "[dim]-[/dim]",
+            agent.role or "[dim]-[/dim]",
+            agent.privilege_level or "[dim]-[/dim]",
+            tools_str,
+        )
+
+    console.print(table)
+
+
+def _render_cut_results_table(result: SwarmRunResult) -> None:
+    """Print the attack results table — one row per attack."""
+    table = Table(
+        title=f"\n[bold]Attack Results ({len(result.results)})[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Result", width=10)
+    table.add_column("Severity", width=10)
+    table.add_column("Payload", max_width=30)
+    table.add_column("Attack Type", width=12)
+    table.add_column("Target Agent", width=15)
+    table.add_column("OWASP", width=10)
+
+    for i, r in enumerate(result.results, 1):
+        cls_style = _SWARM_STYLES.get(r.classification.value, "")
+        sev_style = _SEVERITY_STYLES.get(r.severity.value, "")
+        owasp = ", ".join(r.owasp_ids) if r.owasp_ids else "-"
+
+        table.add_row(
+            str(i),
+            Text(r.classification.value.upper(), style=cls_style),
+            Text(r.severity.value.upper(), style=sev_style),
+            r.payload_name,
+            r.attack_type.value,
+            r.target_agent or "-",
+            owasp,
+        )
+
+    console.print(table)
+
+
+def _render_cut_exploited_details(result: SwarmRunResult) -> None:
+    """Print expanded details for exploited and partial swarm attack results."""
+    notable = [
+        r
+        for r in result.results
+        if r.classification
+        in (
+            SwarmClassification.EXPLOITED,
+            SwarmClassification.PARTIAL,
+        )
+    ]
+
+    if not notable:
+        return
+
+    for r in notable:
+        cls_style = _SWARM_STYLES.get(r.classification.value, "")
+        border = "red" if r.classification == SwarmClassification.EXPLOITED else "yellow"
+
+        lines = [
+            f"[{cls_style}]{r.classification.value.upper()}[/{cls_style}] {r.payload_name}",
+            f"\n[bold]Intent:[/bold] {r.intent}",
+            f"\n[bold]Attack type:[/bold] {r.attack_type.value}",
+        ]
+
+        if r.sender_agent:
+            lines.append(f"\n[bold]Sender:[/bold] {r.sender_agent}")
+        if r.target_agent:
+            lines.append(f"\n[bold]Target:[/bold] {r.target_agent}")
+
+        if r.observation.action_taken:
+            lines.append(f"\n[bold]Action taken:[/bold] {r.observation.action_taken}")
+
+        if r.observation.delegation_path:
+            path_str = " -> ".join(r.observation.delegation_path)
+            lines.append(f"\n[bold]Delegation path:[/bold] {path_str}")
+
+        lines.append(f"\n[bold]Judge:[/bold] {r.explanation}")
+
+        console.print(
+            Panel(
+                "\n".join(lines),
+                border_style=border,
+                expand=False,
+            )
+        )
+
+
+def _render_cut_summary(result: SwarmRunResult) -> None:
+    """Print the cut summary panel."""
+    total = len(result.results)
+    summary_lines = [
+        f"[bold]Total attacks:[/bold] {total}",
+        "",
+        f"  [bold red]Exploited:[/bold red] {result.exploited_count}",
+        f"  [yellow]Partial:[/yellow] {result.partial_count}",
+        f"  [green]Blocked:[/green] {result.blocked_count}",
+        f"  [dim]Error:[/dim] {result.error_count}",
+    ]
+
+    if total > 0:
+        exploit_rate = result.exploited_count / total * 100
+        summary_lines.extend(
+            [
+                "",
+                f"[bold]Exploitation rate:[/bold] {exploit_rate:.0f}%",
+            ]
+        )
+
+    summary_lines.extend(
+        [
+            "",
+            f"[bold]Agents in swarm:[/bold] {len(result.agents_discovered)}",
+            f"[bold]Duration:[/bold] {result.duration_seconds:.1f}s",
+        ]
+    )
+
+    has_exploits = result.exploited_count > 0
+    console.print()
+    console.print(
+        Panel(
+            "\n".join(summary_lines),
+            title="[bold]Cut Summary[/bold]",
             border_style="red" if has_exploits else "green",
             expand=False,
         )

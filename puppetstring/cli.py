@@ -449,9 +449,26 @@ def cut(
         puppetstring cut -t crewai://localhost:8001 --type all
     """
     _show_banner()
+
+    valid_types = {"trust", "memory", "delegation", "rogue", "all"}
+    if attack_type not in valid_types:
+        console.print(
+            f"\n[bold red]Unknown attack type:[/bold red] '{attack_type}'\n"
+            f"[bold]Valid types:[/bold] {', '.join(sorted(valid_types))}"
+        )
+        raise typer.Exit(code=1)
+
     console.print(f"\n[bold]Target:[/bold] {target}")
     console.print(f"[bold]Attack type:[/bold] {attack_type}")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 4.[/yellow]")
+
+    # No concrete SwarmAdapter exists yet — inform the user
+    console.print(
+        "\n[yellow]No swarm adapter available yet for this target. "
+        "CrewAI adapter coming in Phase 4B.[/yellow]"
+    )
+    console.print(
+        "[dim]Module scaffolding is in place — use MockSwarmAdapter in tests to verify.[/dim]"
+    )
 
 
 @app.command()

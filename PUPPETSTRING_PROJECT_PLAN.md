@@ -237,6 +237,53 @@
   - Key metric: "Did Agent A successfully cause Agent B to take an action Agent B shouldn't have taken?"
 - Create GitHub profile README (Port53-Cosplay/Port53-Cosplay repo)
 
+### Session 9 — 2026-02-23
+
+**What got done:**
+- Implemented full Phase 4 Agent-to-Agent Simulator (`puppetstring cut`):
+  - **Phase 4A — Models & scaffolding:**
+    - `SwarmAdapter` abstract base class (`adapters/swarm_adapter.py`) — multi-agent system interface (list agents, send messages between agents, read/write shared memory, delegate tasks, inject/remove agents)
+    - Pydantic models (`modules/agent_swarm/models.py`): `AgentInfo`, `SwarmPayload`, `SwarmObservation`, `SwarmResult`, `SwarmRunResult`, enums for `SwarmAttackType` and `SwarmClassification`
+    - `CutEngine` skeleton (`modules/agent_swarm/module.py`) — orchestrator with dispatch routing
+    - `CutConfig` in `config.py` — timeout, max_attacks, delay, judge_model, reset_between_attacks
+    - CLI validation for `puppetstring cut` — validates attack types, prints status
+    - Rich terminal reporter (`reporting/terminal.py`) — `render_cut_result()` with agents table, results table, exploited details, summary panel
+  - **Phase 4B — Demo server & HTTP adapter:**
+    - Deliberately insecure multi-agent demo server (`examples/multi_agent_demo/server.py`) — 2 agents (researcher + executor), 6 documented vulnerabilities, REST API, localhost-only
+    - `HTTPSwarmAdapter` (`adapters/http_swarm_adapter.py`) — concrete SwarmAdapter for HTTP-based multi-agent systems
+  - **Phase 4C — Trust exploitation & shared memory attacks:**
+    - 8 trust exploitation YAML payloads (authority impersonation, supervisor directive, orchestrator claims, emergency protocol, result manipulation, combined file read/email exfil)
+    - 8 shared memory poisoning YAML payloads (instruction command exec, email exfil, file write/read, command key variant, multi-step amplify, namespace escape, overwrite existing)
+    - `SwarmJudge` (`modules/agent_swarm/judge.py`) — 3-tier cascade: tool-call heuristic → LLM judge (LiteLLM) → fallback keyword matching
+    - `payload_loader.py` — YAML loading, Pydantic validation, `{low_priv}`/`{high_priv}` placeholder resolution
+    - Full `_run_trust_exploitation()` and `_run_shared_memory_attack()` implementations in CutEngine
+  - **Phase 4D — Delegation abuse & rogue agent injection:**
+    - 8 delegation abuse YAML payloads (privilege escalation via delegation, chain exploitation, multi-hop)
+    - 8 rogue agent injection YAML payloads (inject + message, inject + delegate, inject + memory poison, injection-only)
+    - Full `_run_delegation_abuse()` and `_run_rogue_agent()` implementations (inject → optional poison → attack → cleanup → judge)
+  - **Tests:** 407 passing, 6 skipped — includes `test_cut.py` (models, adapter interface, engine orchestration, CLI), `test_swarm_attacks.py` (payload loading, judge heuristics, trust/memory unit + integration), `test_swarm_delegation_rogue.py` (delegation/rogue payload loading, unit, integration), `test_http_swarm_adapter.py`, `test_multi_agent_server.py`
+- Ran security review — no actionable vulnerabilities found:
+  - All YAML uses `yaml.safe_load()` (no unsafe deserialization)
+  - No eval/exec, no shell injection, no hardcoded credentials
+  - All HTTP uses httpx with structured JSON (no string concatenation)
+  - Input validation via Pydantic models throughout
+  - Demo server vulnerabilities are intentional by design (documented)
+- Fixed circular import: `swarm_adapter.py` → `agent_swarm.__init__` → `module.py` → `swarm_adapter.py` — resolved by moving `SwarmAdapter` import in `module.py` to `TYPE_CHECKING` block
+- Added MITRE ATLAS mapping to project plan (7 techniques already covered, 3 covered by Phase 4, 6 stretch goals identified)
+- Copied `/end-session` custom command to new project location
+
+**Design decisions:**
+- `SwarmAdapter` is separate from `AgentAdapter` — fundamentally different interaction patterns (swarm-level vs single-agent)
+- Demo server uses pattern matching (no LLM needed) — deterministic, free, self-contained
+- 3-tier judge cascade ensures classification works with or without API keys
+- Integration tests use separate ports per test file (18001, 18002, 18003) to avoid conflicts
+- Rogue agent runner handles complex multi-step attacks: inject → optional memory poison → attack via message OR delegation → cleanup
+
+**Next session — pick up with:**
+- Phase 5: OWASP Audit & Reports (`puppetstring dance` + `puppetstring unravel`)
+- Commit and push all Phase 4 work
+- Create GitHub profile README (Port53-Cosplay/Port53-Cosplay repo)
+
 ---
 
 ## 1. Vision & Elevator Pitch
@@ -1333,13 +1380,14 @@ company_name = ""
 
 **Goal:** `puppetstring cut` tests multi-agent systems for cross-agent attacks.
 
-- [ ] Implement CrewAI adapter
-- [ ] Implement trust exploitation tests
-- [ ] Implement shared memory attack tests
-- [ ] Implement delegation abuse tests
-- [ ] Implement rogue agent injection
-- [ ] Build vulnerable multi-agent test target (`puppetstring stage --target vulnerable-swarm`)
-- [ ] Write tests
+- [x] Implement SwarmAdapter ABC + HTTPSwarmAdapter (HTTP-based, framework-agnostic)
+- [x] Implement trust exploitation attacks (8 payloads, authority impersonation)
+- [x] Implement shared memory attack tests (8 payloads, memory poisoning)
+- [x] Implement delegation abuse tests (8 payloads, privilege escalation via delegation)
+- [x] Implement rogue agent injection (8 payloads, inject + attack + cleanup)
+- [x] Build vulnerable multi-agent test target (`examples/multi_agent_demo/server.py`)
+- [x] Write tests (136 new tests across 5 test files)
+- [ ] Implement CrewAI adapter (stretch — HTTPSwarmAdapter covers HTTP-based swarms)
 
 **Definition of done:** Run `puppetstring cut --target crewai://localhost:8001 --type all` and identify cross-agent attack paths.
 
