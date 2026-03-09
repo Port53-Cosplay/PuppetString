@@ -50,6 +50,9 @@ EXPECTED_MODULES = [
     "puppetstring.reporting.report_generator",
     "puppetstring.utils.logging",
     "puppetstring.utils.constants",
+    "puppetstring.staging",
+    "puppetstring.staging.models",
+    "puppetstring.staging.manager",
 ]
 
 
@@ -205,3 +208,12 @@ class TestModuleImports:
 
     def test_import_report_generator(self) -> None:
         self._import("puppetstring.reporting.report_generator")
+
+    def test_import_staging(self) -> None:
+        self._import("puppetstring.staging")
+
+    def test_import_staging_models(self) -> None:
+        self._import("puppetstring.staging.models")
+
+    def test_import_staging_manager(self) -> None:
+        self._import("puppetstring.staging.manager")

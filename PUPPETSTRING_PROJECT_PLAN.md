@@ -319,6 +319,50 @@ Implemented the full OWASP Audit (`dance`) and Report Generation (`unravel`) lay
 
 **Test results:** 486 passed, 6 skipped, 0 failures (69 new tests)
 
+### Session 11 — 2026-03-08 (evening)
+
+**What got done:**
+- Implemented `puppetstring stage` command — subprocess-based test target manager:
+  - `puppetstring/staging/models.py` — TargetName, TargetDefinition, ProcessState, StageState, TargetStatus
+  - `puppetstring/staging/manager.py` — StageManager with up/down/status, cross-platform process management (Windows `tasklist`/`taskkill` with `CREATE_NO_WINDOW`, Unix `os.kill`/`/proc`)
+  - State persistence via JSON in temp dir (hash-keyed by project root, survives terminal sessions)
+  - Health checking: socket port polling with 10s timeout
+  - Defence-in-depth: `_is_puppetstring_process()` validates PID command line before kill, `_is_safe_log_path()` validates log file path before deletion
+  - Terminal rendering: `render_stage_status()` with Rich table (RUNNING/STOPPED/UNHEALTHY) and hints panel
+  - CLI wiring: validates action/target, dispatches to manager, renders results, exit code 1 on failure
+  - 38 tests in `test_stage.py` across 5 classes
+- Fixed `--type all` routing bug in `pull` command:
+  - `all` was in `MCP_SCAN_TYPES`, so `puppetstring pull -t http://... --type all` routed to MCP scanner instead of fuzzer
+  - Now routes based on target URL scheme (`http://` → fuzzer, `mcp://` → scanner)
+  - Added guard for MCP-only types (`auth`, `permissions`, etc.) used with HTTP targets — clear error message
+- Removed dead `--output`/`-o` flag from `pull`, `tangle`, `cut`, `dance` commands (was never implemented, confused users)
+- Added JPEG document format to tangle:
+  - 4 steganography techniques: JPEG_EXIF (native EXIF metadata), JPEG_XMP (APP1 segment), JPEG_OVERLAY (near-invisible text), JPEG_COMMENT (COM marker injection)
+  - `_generate_jpeg()` method + `_save_jpeg_bytes()` helper in document_generator.py
+  - 4 JPEG payloads in document_injection.yaml
+  - 8 tests in TestDocumentGeneratorJPEG (including EXIF round-trip verification)
+- Renamed all generated document filenames from `poisoned_*.ext` to realistic business names:
+  - Before: `poisoned_image_exif.png`, `poisoned_svg_desc.svg`
+  - After: `quarterly_revenue_chart.png`, `Q4_sales_breakdown.svg`
+  - Module-level `_REALISTIC_FILENAMES` dict with `_filename_for()` helper
+  - Prevents AI targets from detecting the attack based on filename alone
+- Security review: ran `/security-review`, no high-confidence vulnerabilities found
+- Created `DEMO_WALKTHROUGH.md` (gitignored) — 16-section comprehensive guide for live demos
+- Improved `--type` help text: split MCP scanning and workflow fuzzing onto separate lines with URL scheme hints
+
+**Design decisions:**
+- Stage uses subprocess (not Docker) — zero additional dependencies, works everywhere
+- State file hash-keyed by project root — multiple checkouts don't collide
+- JPEG uses same Pillow optional dependency as PNG — no new deps
+- Realistic filenames are critical for meaningful injection testing — obvious names like `poisoned_*` trigger AI suspicion before the payload even runs
+- URL scheme determines routing for ambiguous `--type` values (`all`, `scan`)
+
+**Next session — pick up with:**
+- Phase 6: Polish & Launch
+- Memory notes to address: change tagline (too marketing-y), fix pull findings detail panel widths
+- Consider adding `/v1/inject` endpoint to vulnerable agent for tool-output injection testing
+- Explore more image steganography techniques (WebP support, more sophisticated overlays)
+
 ---
 
 ## 1. Vision & Elevator Pitch
@@ -1583,7 +1627,7 @@ Title idea: _"I Built an Open-Source Red Team Toolkit for AI Agents — Here's W
 
 ### Full Success (All phases complete)
 
-- [ ] All commands working (`pull`, `tangle`, `cut`, `dance`, `unravel`, `stage`)
+- [x] All commands working (`pull`, `tangle`, `cut`, `dance`, `unravel`, `stage`)
 - [ ] OWASP coverage across all 10 categories
 - [ ] Companion blog post published
 - [ ] Conference talk submitted

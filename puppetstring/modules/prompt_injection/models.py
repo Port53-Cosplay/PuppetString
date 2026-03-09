@@ -3,9 +3,9 @@
 These Pydantic models define the shape of all data flowing through the tangle
 module. Two modes:
 
-    1. DOCUMENT MODE — Generate poisoned documents (SVG, HTML, PDF, Markdown)
-       that contain hidden instructions. Upload them to any AI system to test
-       whether the agent follows the hidden instructions.
+    1. DOCUMENT MODE — Generate poisoned documents (SVG, HTML, PDF, Markdown,
+       PNG, JPEG) that contain hidden instructions. Upload them to any AI
+       system to test whether the agent follows the hidden instructions.
 
     2. LIVE MODE — Test a running agent by intercepting tool outputs and
        injecting adversarial content mid-flight. The agent calls a tool,
@@ -48,6 +48,7 @@ class DocumentFormat(StrEnum):
     MARKDOWN = "markdown"
     PDF = "pdf"
     IMAGE = "image"
+    JPEG = "jpeg"
     PLAINTEXT = "plaintext"
 
 
@@ -85,6 +86,12 @@ class EncodingTechnique(StrEnum):
     IMAGE_XMP = "image-xmp"  # XMP XML metadata packet
     IMAGE_OVERLAY = "image-overlay"  # near-invisible text drawn on image
     IMAGE_IPTC = "image-iptc"  # PNG text chunks (Description, Comment)
+
+    # JPEG-specific
+    JPEG_EXIF = "jpeg-exif"  # EXIF metadata (native JPEG format)
+    JPEG_XMP = "jpeg-xmp"  # XMP XML packet in JPEG APP1 segment
+    JPEG_OVERLAY = "jpeg-overlay"  # near-invisible text drawn on image
+    JPEG_COMMENT = "jpeg-comment"  # JPEG COM marker (file-level comment)
 
     # Unicode (works in any text format)
     UNICODE_ZERO_WIDTH = "unicode-zero-width"  # ZWJ/ZWNJ/ZWSP

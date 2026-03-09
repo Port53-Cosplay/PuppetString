@@ -46,3 +46,6 @@ htmlcov/
 # Claude Code local settings (machine-specific, never push)
 .claude/settings.local.json
 .claude/local_env.md
+
+# Personal files (not for GitHub)
+DEMO_WALKTHROUGH.md

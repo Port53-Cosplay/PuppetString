@@ -126,8 +126,9 @@ def pull(
         "all",
         "--type",
         help=(
-            "What to test. For MCP scanning: scan, tools, auth, permissions, inputs, config. "
-            "For workflow fuzzing: tool-abuse, memory-poison, boundary, chain, all."
+            "What to test.\n\n"
+            "MCP scanning (mcp:// targets): scan, tools, auth, permissions, inputs, config.\n\n"
+            "Workflow fuzzing (http:// targets): tool-abuse, memory-poison, boundary, chain, all."
         ),
     ),
     payloads: str | None = typer.Option(
@@ -135,12 +136,6 @@ def pull(
         "--payloads",
         "-p",
         help="Path to a custom YAML payloads file.",
-    ),
-    output: str = typer.Option(
-        "terminal",
-        "--output",
-        "-o",
-        help="Output format: terminal, html, json, markdown.",
     ),
 ) -> None:
     """[bold magenta]Pull the strings[/bold magenta] — MCP scanning + workflow fuzzing.
@@ -169,7 +164,24 @@ def pull(
         )
         raise typer.Exit(code=1)
 
-    if scan_type in MCP_SCAN_TYPES:
+    # Route based on target URL scheme first, then scan type.
+    # "all" and "scan" exist in MCP_SCAN_TYPES but should route to the fuzzer
+    # when the target is an HTTP endpoint.
+    is_http_target = target.startswith(("http://", "https://"))
+    mcp_only_types = MCP_SCAN_TYPES - {"all", "scan"}
+
+    if is_http_target and scan_type in mcp_only_types:
+        console.print(
+            f"\n[bold red]Type '{scan_type}' is for MCP targets (mcp://), "
+            f"not HTTP targets.[/bold red]\n"
+            f"[bold]HTTP fuzzing types:[/bold] tool-abuse, memory-poison, "
+            f"boundary, chain, all"
+        )
+        raise typer.Exit(code=1)
+
+    use_mcp = scan_type in MCP_SCAN_TYPES and not is_http_target
+
+    if use_mcp:
         # MCP scanning — Phase 1
         from puppetstring.config import load_config  # noqa: PLC0415
         from puppetstring.modules.mcp_scanner.scanner import MCPScanner  # noqa: PLC0415
@@ -186,10 +198,7 @@ def pull(
             console.print("\n[yellow]Scan interrupted by user.[/yellow]")
             raise typer.Exit(code=1) from None
 
-        if output == "terminal":
-            render_scan_result(result)
-        else:
-            console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+        render_scan_result(result)
 
         if result.error:
             raise typer.Exit(code=1)
@@ -218,10 +227,7 @@ def pull(
                 )
                 fuzz_result = await fuzzer.run(fuzz_type=scan_type)
 
-            if output == "terminal":
-                render_fuzz_result(fuzz_result)
-            else:
-                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+            render_fuzz_result(fuzz_result)
 
             if fuzz_result.exploited_count > 0:
                 raise typer.Exit(code=1)
@@ -263,19 +269,13 @@ def tangle(
         "-f",
         help=(
             "Document formats to generate (comma-separated): "
-            "svg, html, markdown, pdf, image. Default: svg,html,markdown."
+            "svg, html, markdown, pdf, image, jpeg. Default: svg,html,markdown."
         ),
     ),
     output_dir: str | None = typer.Option(
         None,
         "--output-dir",
         help="Directory for generated documents. Default: ./puppetstring_results/tangle_documents.",
-    ),
-    output: str = typer.Option(
-        "terminal",
-        "--output",
-        "-o",
-        help="Output format: terminal, html, json, markdown.",
     ),
 ) -> None:
     """[bold magenta]Tangle the inputs[/bold magenta] — indirect prompt injection testing.
@@ -351,10 +351,7 @@ def tangle(
                     goal=effective_goal,
                 )
 
-            if output == "terminal":
-                render_tangle_result(tangle_result)
-            else:
-                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+            render_tangle_result(tangle_result)
 
             if tangle_result.exploited_count > 0:
                 raise typer.Exit(code=1)
@@ -387,7 +384,7 @@ def tangle(
                 except ValueError:
                     console.print(
                         f"\n[bold red]Unknown format:[/bold red] '{name}'\n"
-                        f"[bold]Valid formats:[/bold] svg, html, markdown, pdf, image"
+                        f"[bold]Valid formats:[/bold] svg, html, markdown, pdf, image, jpeg"
                     )
                     raise typer.Exit(code=1) from None
 
@@ -406,10 +403,7 @@ def tangle(
                 output_dir=effective_output_dir,
             )
 
-            if output == "terminal":
-                render_tangle_result(tangle_result)
-            else:
-                console.print(f"\n[yellow]Output format '{output}' not implemented yet.[/yellow]")
+            render_tangle_result(tangle_result)
 
         try:
             asyncio.run(_run_document())
@@ -430,12 +424,6 @@ def cut(
         "all",
         "--type",
         help="Attack type: trust, memory, delegation, rogue, all.",
-    ),
-    output: str = typer.Option(
-        "terminal",
-        "--output",
-        "-o",
-        help="Output format: terminal, html, json, markdown.",
     ),
 ) -> None:
     """[bold magenta]Cut the strings[/bold magenta] — agent-to-agent attack simulation.
@@ -490,12 +478,6 @@ def dance(
         "--passive-only",
         help="Only generate a coverage gap report — no active testing.",
     ),
-    output: str = typer.Option(
-        "terminal",
-        "--output",
-        "-o",
-        help="Output format: terminal, html, json, markdown.",
-    ),
 ) -> None:
     """[bold magenta]Make it dance[/bold magenta] — full OWASP agentic AI audit.
 
@@ -530,13 +512,7 @@ def dance(
         console.print("\n[yellow]Audit interrupted by user.[/yellow]")
         raise typer.Exit(code=1) from None
 
-    if output == "terminal":
-        render_dance_result(result)
-    else:
-        console.print(
-            f"\n[yellow]Output format '{output}' not implemented yet. "
-            "Use 'unravel' for reports.[/yellow]"
-        )
+    render_dance_result(result)
 
     if result.has_critical_or_high:
         raise typer.Exit(code=1)
@@ -648,6 +624,48 @@ def stage(
         puppetstring stage status              # Check what's running
     """
     _show_banner()
-    console.print(f"\n[bold]Action:[/bold] {action}")
-    console.print(f"[bold]Target:[/bold] {target}")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 1.[/yellow]")
+
+    valid_actions = {"up", "down", "status"}
+    if action not in valid_actions:
+        console.print(
+            f"\n[bold red]Unknown action:[/bold red] '{action}'\n"
+            f"[bold]Valid actions:[/bold] {', '.join(sorted(valid_actions))}"
+        )
+        raise typer.Exit(code=1)
+
+    valid_targets = {"mcp", "agent", "swarm", "all"}
+    if target not in valid_targets:
+        console.print(
+            f"\n[bold red]Unknown target:[/bold red] '{target}'\n"
+            f"[bold]Valid targets:[/bold] {', '.join(sorted(valid_targets))}"
+        )
+        raise typer.Exit(code=1)
+
+    from puppetstring.reporting.terminal import render_stage_status  # noqa: PLC0415
+    from puppetstring.staging.manager import StageManager  # noqa: PLC0415
+    from puppetstring.staging.models import TargetName  # noqa: PLC0415
+
+    # Resolve target names
+    if target == "all":
+        target_names = list(TargetName)
+    else:
+        target_names = [TargetName(target)]
+
+    try:
+        manager = StageManager()
+    except FileNotFoundError as exc:
+        console.print(f"\n[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1) from None
+
+    if action == "up":
+        statuses = manager.up(target_names)
+    elif action == "down":
+        statuses = manager.down(target_names)
+    else:
+        statuses = manager.status()
+
+    render_stage_status(statuses, action)
+
+    # Exit code 1 if any target failed to start during "up"
+    if action == "up" and any(not s.healthy for s in statuses):
+        raise typer.Exit(code=1)

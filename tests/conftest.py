@@ -41,6 +41,7 @@ from puppetstring.modules.prompt_injection.models import (
     InjectionResult,
     TangleRunResult,
 )
+from puppetstring.staging.models import TargetName, TargetStatus
 
 
 @pytest.fixture
@@ -273,3 +274,39 @@ def dance_run_result(
         coverage=owasp_coverage,
         all_findings=[sample_unified_finding],
     )
+
+
+# ── Stage fixtures ──────────────────────────────────────────────
+
+
+@pytest.fixture
+def sample_target_status_list() -> list[TargetStatus]:
+    """A list of TargetStatus objects covering running, stopped, and unhealthy."""
+    return [
+        TargetStatus(
+            name=TargetName.MCP,
+            display_name="Vulnerable MCP Server",
+            description="FastMCP server with 8 insecure tools",
+            port=3000,
+            pid=100,
+            running=True,
+            healthy=True,
+        ),
+        TargetStatus(
+            name=TargetName.AGENT,
+            display_name="Vulnerable AI Agent",
+            description="Pattern-matching HTTP agent",
+            port=8000,
+            running=False,
+            healthy=False,
+        ),
+        TargetStatus(
+            name=TargetName.SWARM,
+            display_name="Multi-Agent Swarm",
+            description="Two-agent system with privilege escalation",
+            port=8001,
+            pid=200,
+            running=True,
+            healthy=False,
+        ),
+    ]

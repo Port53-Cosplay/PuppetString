@@ -9,6 +9,8 @@ Produces:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -33,6 +35,9 @@ from puppetstring.modules.prompt_injection.models import (
     InjectionClassification,
     TangleRunResult,
 )
+
+if TYPE_CHECKING:
+    from puppetstring.staging.models import TargetStatus
 
 console = Console()
 
@@ -922,4 +927,90 @@ def _render_dance_summary(result: DanceRunResult) -> None:
             expand=False,
         )
     )
+    console.print()
+
+
+# ── Stage (target management) rendering ──────────────────────────
+
+
+def render_stage_status(
+    statuses: list[TargetStatus],
+    action: str,
+) -> None:
+    """Render the stage status table for test targets.
+
+    Parameters
+    ----------
+    statuses:
+        List of TargetStatus objects (one per target).
+    action:
+        The action that was performed: "up", "down", or "status".
+    """
+    action_labels = {"up": "Deploy", "down": "Teardown", "status": "Status"}
+    label = action_labels.get(action, action.title())
+
+    console.print()
+    console.print(
+        Panel(
+            f"[bold]Action:[/bold] {label}\n[bold]Targets:[/bold] {len(statuses)}",
+            title="[bold magenta]PuppetString Stage[/bold magenta]",
+            border_style="magenta",
+            expand=False,
+        )
+    )
+
+    # Status table
+    table = Table(
+        title="\n[bold]Test Targets[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("Target", style="bold")
+    table.add_column("Status", min_width=8)
+    table.add_column("Port", justify="right")
+    table.add_column("PID", justify="right")
+    table.add_column("Description", max_width=60)
+
+    for s in statuses:
+        if s.running and s.healthy:
+            status_text = Text("RUNNING", style="bold green")
+        elif s.running and not s.healthy:
+            status_text = Text("UNHEALTHY", style="bold yellow")
+        else:
+            status_text = Text("STOPPED", style="dim")
+
+        pid_text = str(s.pid) if s.pid else "-"
+
+        table.add_row(
+            s.display_name,
+            status_text,
+            str(s.port),
+            pid_text,
+            s.description,
+        )
+
+    console.print(table)
+
+    # After "up": show hints panel
+    if action == "up" and any(s.healthy for s in statuses):
+        running = [s for s in statuses if s.healthy]
+        hint_lines: list[str] = ["[bold]Ready to test:[/bold]", ""]
+        for s in running:
+            if s.name == "mcp":
+                hint_lines.append(f"  puppetstring pull -t mcp://127.0.0.1:{s.port}")
+            elif s.name == "agent":
+                hint_lines.append(f"  puppetstring tangle -t http://127.0.0.1:{s.port}")
+            elif s.name == "swarm":
+                hint_lines.append(f"  puppetstring cut -t http://127.0.0.1:{s.port}")
+
+        console.print()
+        console.print(
+            Panel(
+                "\n".join(hint_lines),
+                border_style="green",
+                expand=False,
+            )
+        )
+
     console.print()

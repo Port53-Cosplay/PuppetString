@@ -8,7 +8,8 @@ HOW THIS WORKS:
     HTML: white text, display:none divs, comments, aria-hidden spans, data-* attrs
     Markdown: HTML comments, link titles, image alt text
     PDF:  white text on white background, metadata fields, tiny text at margins
-    Image: EXIF metadata, XMP packets, near-invisible text overlays, PNG text chunks
+    Image (PNG): EXIF metadata, XMP packets, near-invisible text overlays, PNG text chunks
+    JPEG: EXIF metadata (native), XMP packets, near-invisible overlays, COM markers
 
     The generator produces realistic-looking documents (charts, reports, pages)
     with adversarial instructions hidden using one or more techniques. These
@@ -38,6 +39,51 @@ from puppetstring.utils.logging import get_logger
 
 logger = get_logger(__name__)
 
+# Realistic filenames so the AI doesn't get suspicious from the name alone.
+# Each technique gets a unique but boring-looking business document name.
+_REALISTIC_FILENAMES: dict[EncodingTechnique, str] = {
+    # SVG
+    EncodingTechnique.SVG_DESC: "quarterly_revenue_chart.svg",
+    EncodingTechnique.SVG_TITLE: "Q4_sales_breakdown.svg",
+    EncodingTechnique.SVG_METADATA: "annual_growth_metrics.svg",
+    EncodingTechnique.SVG_INVISIBLE_TEXT: "market_share_analysis.svg",
+    EncodingTechnique.SVG_HIDDEN_RECT: "department_budget_overview.svg",
+    EncodingTechnique.SVG_COMMENT: "customer_acquisition_trends.svg",
+    EncodingTechnique.SVG_DATA_ATTR: "product_performance_dashboard.svg",
+    # HTML
+    EncodingTechnique.HTML_WHITE_TEXT: "Q4_revenue_report.html",
+    EncodingTechnique.HTML_DISPLAY_NONE: "company_update_Q4.html",
+    EncodingTechnique.HTML_COMMENT: "investor_summary_2025.html",
+    EncodingTechnique.HTML_ARIA_HIDDEN: "board_presentation_draft.html",
+    EncodingTechnique.HTML_DATA_ATTR: "quarterly_financials.html",
+    # Markdown
+    EncodingTechnique.MD_COMMENT: "team_meeting_notes_jan.md",
+    EncodingTechnique.MD_LINK_TITLE: "project_status_update.md",
+    EncodingTechnique.MD_ALT_TEXT: "sprint_review_notes.md",
+    # PDF
+    EncodingTechnique.PDF_WHITE_TEXT: "Q4_2025_revenue_report.pdf",
+    EncodingTechnique.PDF_METADATA: "annual_financial_summary.pdf",
+    EncodingTechnique.PDF_TINY_TEXT: "executive_briefing_Q4.pdf",
+    # PNG
+    EncodingTechnique.IMAGE_EXIF: "quarterly_revenue_chart.png",
+    EncodingTechnique.IMAGE_XMP: "sales_performance_Q4.png",
+    EncodingTechnique.IMAGE_OVERLAY: "growth_metrics_2025.png",
+    EncodingTechnique.IMAGE_IPTC: "market_analysis_chart.png",
+    # JPEG
+    EncodingTechnique.JPEG_EXIF: "sales_dashboard_Q4.jpg",
+    EncodingTechnique.JPEG_XMP: "revenue_breakdown_2025.jpg",
+    EncodingTechnique.JPEG_OVERLAY: "annual_performance_chart.jpg",
+    EncodingTechnique.JPEG_COMMENT: "department_metrics_Q4.jpg",
+}
+
+
+def _filename_for(technique: EncodingTechnique, fallback_ext: str = "") -> str:
+    """Get a realistic filename for a technique, with a safe fallback."""
+    return _REALISTIC_FILENAMES.get(
+        technique,
+        f"document_{technique.value.replace('-', '_')}{fallback_ext}",
+    )
+
 
 class DocumentGenerator:
     """Generates poisoned documents with hidden adversarial instructions."""
@@ -66,9 +112,10 @@ class DocumentGenerator:
             # Only include PDF if fpdf2 is available
             if _pdf_available():
                 formats.append(DocumentFormat.PDF)
-            # Only include IMAGE if Pillow is available
+            # Only include IMAGE/JPEG if Pillow is available
             if _pillow_available():
                 formats.append(DocumentFormat.IMAGE)
+                formats.append(DocumentFormat.JPEG)
 
         docs: list[GeneratedDocument] = []
 
@@ -101,6 +148,7 @@ class DocumentGenerator:
             DocumentFormat.MARKDOWN: self._generate_markdown,
             DocumentFormat.PDF: self._generate_pdf,
             DocumentFormat.IMAGE: self._generate_image,
+            DocumentFormat.JPEG: self._generate_jpeg,
         }
 
         generator = generators.get(fmt)
@@ -119,7 +167,7 @@ class DocumentGenerator:
 
         for doc in docs:
             file_path = self._output_dir / doc.filename
-            if doc.format in (DocumentFormat.PDF, DocumentFormat.IMAGE):
+            if doc.format in (DocumentFormat.PDF, DocumentFormat.IMAGE, DocumentFormat.JPEG):
                 # Binary formats are written by their generators directly
                 continue
             file_path.write_text(doc.raw_content, encoding="utf-8")
@@ -180,7 +228,7 @@ class DocumentGenerator:
         return GeneratedDocument(
             format=DocumentFormat.SVG,
             technique=technique,
-            filename=f"poisoned_{technique.value.replace('-', '_')}.svg",
+            filename=_filename_for(technique, ".svg"),
             hidden_text=hidden_text,
             visible_content="Bar chart showing quarterly revenue",
             raw_content=content,
@@ -222,7 +270,7 @@ class DocumentGenerator:
         return GeneratedDocument(
             format=DocumentFormat.HTML,
             technique=technique,
-            filename=f"poisoned_{technique.value.replace('-', '_')}.html",
+            filename=_filename_for(technique, ".html"),
             hidden_text=hidden_text,
             visible_content="Company quarterly report page",
             raw_content=content,
@@ -256,7 +304,7 @@ class DocumentGenerator:
         return GeneratedDocument(
             format=DocumentFormat.MARKDOWN,
             technique=technique,
-            filename=f"poisoned_{technique.value.replace('-', '_')}.md",
+            filename=_filename_for(technique, ".md"),
             hidden_text=hidden_text,
             visible_content="Meeting notes document",
             raw_content=content,
@@ -316,7 +364,7 @@ class DocumentGenerator:
                 msg = f"Technique {technique} not applicable to PDF"
                 raise ValueError(msg)
 
-        filename = f"poisoned_{technique.value.replace('-', '_')}.pdf"
+        filename = _filename_for(technique, ".pdf")
         raw_content = pdf.output()  # returns bytes
 
         doc = GeneratedDocument(
@@ -362,7 +410,7 @@ class DocumentGenerator:
                 exif[ExifBase.Artist] = hidden_text
                 exif[ExifBase.Copyright] = hidden_text
 
-                filename = "poisoned_image_exif.png"
+                filename = _filename_for(technique, ".png")
                 raw_bytes = _save_png_bytes(img, exif=exif)
 
             case EncodingTechnique.IMAGE_XMP:
@@ -381,7 +429,7 @@ class DocumentGenerator:
                 png_info = PngImagePlugin.PngInfo()
                 png_info.add_text("XML:com.adobe.xmp", xmp_packet)
 
-                filename = "poisoned_image_xmp.png"
+                filename = _filename_for(technique, ".png")
                 raw_bytes = _save_png_bytes(img, png_info=png_info)
 
             case EncodingTechnique.IMAGE_OVERLAY:
@@ -396,7 +444,7 @@ class DocumentGenerator:
                 draw.text((5, 5), hidden_text, fill=(0, 0, 0, 3), font=font)
                 img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
 
-                filename = "poisoned_image_overlay.png"
+                filename = _filename_for(technique, ".png")
                 raw_bytes = _save_png_bytes(img)
 
             case EncodingTechnique.IMAGE_IPTC:
@@ -406,7 +454,7 @@ class DocumentGenerator:
                 png_info.add_text("Comment", hidden_text)
                 png_info.add_text("Author", hidden_text)
 
-                filename = "poisoned_image_iptc.png"
+                filename = _filename_for(technique, ".png")
                 raw_bytes = _save_png_bytes(img, png_info=png_info)
 
             case _:
@@ -424,6 +472,103 @@ class DocumentGenerator:
         )
 
         # Write PNG if output dir is set
+        if self._output_dir:
+            self._output_dir.mkdir(parents=True, exist_ok=True)
+            file_path = self._output_dir / filename
+            file_path.write_bytes(raw_bytes)
+            doc.file_path = file_path
+            logger.info("Wrote %s (%d bytes)", file_path, doc.size_bytes)
+
+        return doc
+
+    # ── JPEG generation ──────────────────────────────────────────
+
+    def _generate_jpeg(self, hidden_text: str, technique: EncodingTechnique) -> GeneratedDocument:
+        """Generate a poisoned JPEG image with hidden adversarial instructions.
+
+        JPEG is the most common image format uploaded to multimodal AI chatbots.
+        It supports EXIF natively (EXIF was designed for JPEG), XMP via APP1
+        segments, and a file-level COM (comment) marker — all invisible to users
+        but readable by LLMs that parse image metadata.
+        """
+        if not _pillow_available():
+            msg = "Pillow is not installed. Run: pip install Pillow"
+            raise ImportError(msg)
+
+        from PIL import Image, ImageDraw, ImageFont  # noqa: PLC0415
+
+        img = _create_default_chart_image()
+
+        match technique:
+            case EncodingTechnique.JPEG_EXIF:
+                from PIL.ExifTags import Base as ExifBase  # noqa: PLC0415
+
+                exif = img.getexif()
+                exif[ExifBase.ImageDescription] = hidden_text
+                exif[ExifBase.Artist] = hidden_text
+                exif[ExifBase.Copyright] = hidden_text
+
+                filename = _filename_for(technique, ".jpg")
+                raw_bytes = _save_jpeg_bytes(img, exif=exif)
+
+            case EncodingTechnique.JPEG_XMP:
+                # XMP is stored in JPEG APP1 segment — Pillow writes it
+                # via the `xmp` keyword in JPEG save
+                xmp_packet = (
+                    '<?xpacket begin="\xef\xbb\xbf" id="W5M0MpCehiHzreSzNTczkc9d"?>'
+                    '<x:xmpmeta xmlns:x="adobe:ns:meta/">'
+                    '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+                    '<rdf:Description xmlns:dc="http://purl.org/dc/elements/1.1/">'
+                    f"<dc:description>{hidden_text}</dc:description>"
+                    "</rdf:Description>"
+                    "</rdf:RDF>"
+                    "</x:xmpmeta>"
+                    '<?xpacket end="w"?>'
+                )
+
+                filename = _filename_for(technique, ".jpg")
+                raw_bytes = _save_jpeg_bytes(img, xmp=xmp_packet.encode("utf-8"))
+
+            case EncodingTechnique.JPEG_OVERLAY:
+                overlay = Image.new("RGBA", img.size, (0, 0, 0, 0))
+                draw = ImageDraw.Draw(overlay)
+                try:
+                    font = ImageFont.truetype("arial.ttf", 10)
+                except OSError:
+                    font = ImageFont.load_default()
+                draw.text((5, 5), hidden_text, fill=(0, 0, 0, 3), font=font)
+                img = Image.alpha_composite(img.convert("RGBA"), overlay).convert("RGB")
+
+                filename = _filename_for(technique, ".jpg")
+                raw_bytes = _save_jpeg_bytes(img)
+
+            case EncodingTechnique.JPEG_COMMENT:
+                # JPEG COM marker — Pillow doesn't write COM markers directly,
+                # so we inject the comment into the raw JPEG bytes after the
+                # SOI marker (first 2 bytes: FF D8).
+                filename = _filename_for(technique, ".jpg")
+                base_bytes = _save_jpeg_bytes(img)
+                comment_bytes = hidden_text.encode("utf-8")
+                # COM marker: FF FE + 2-byte length (includes length field itself)
+                com_length = len(comment_bytes) + 2
+                com_marker = b"\xff\xfe" + com_length.to_bytes(2, "big") + comment_bytes
+                # Insert after SOI (FF D8)
+                raw_bytes = base_bytes[:2] + com_marker + base_bytes[2:]
+
+            case _:
+                msg = f"Technique {technique} not applicable to JPEG"
+                raise ValueError(msg)
+
+        doc = GeneratedDocument(
+            format=DocumentFormat.JPEG,
+            technique=technique,
+            filename=filename,
+            hidden_text=hidden_text,
+            visible_content="Bar chart showing quarterly revenue",
+            raw_content="[binary JPEG content]",
+            size_bytes=len(raw_bytes),
+        )
+
         if self._output_dir:
             self._output_dir.mkdir(parents=True, exist_ok=True)
             file_path = self._output_dir / filename
@@ -491,6 +636,12 @@ def _techniques_for_format(fmt: DocumentFormat) -> list[EncodingTechnique]:
             EncodingTechnique.IMAGE_XMP,
             EncodingTechnique.IMAGE_OVERLAY,
             EncodingTechnique.IMAGE_IPTC,
+        ],
+        DocumentFormat.JPEG: [
+            EncodingTechnique.JPEG_EXIF,
+            EncodingTechnique.JPEG_XMP,
+            EncodingTechnique.JPEG_OVERLAY,
+            EncodingTechnique.JPEG_COMMENT,
         ],
     }
     return mapping.get(fmt, [])
@@ -640,4 +791,22 @@ def _save_png_bytes(
     if png_info is not None:
         kwargs["pnginfo"] = png_info
     img.save(buf, **kwargs)
+    return buf.getvalue()
+
+
+def _save_jpeg_bytes(
+    img: Any,
+    exif: Any | None = None,
+    xmp: bytes | None = None,
+) -> bytes:
+    """Save a PIL Image to JPEG bytes with optional EXIF/XMP metadata."""
+    import io  # noqa: PLC0415
+
+    buf = io.BytesIO()
+    kwargs: dict = {"format": "JPEG", "quality": 90}
+    if exif is not None:
+        kwargs["exif"] = exif.tobytes()
+    if xmp is not None:
+        kwargs["xmp"] = xmp
+    img.convert("RGB").save(buf, **kwargs)
     return buf.getvalue()

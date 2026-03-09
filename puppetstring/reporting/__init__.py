@@ -1,10 +1,10 @@
-"""Report renderers for scan, fuzz, tangle, cut, and dance results."""
+"""Report renderers for scan, fuzz, tangle, cut, dance, and stage results."""
 
 from puppetstring.reporting.html_reporter import render_html_report
 from puppetstring.reporting.json_reporter import render_json_report
 from puppetstring.reporting.markdown_reporter import render_markdown_report
 from puppetstring.reporting.report_generator import UnravelEngine
-from puppetstring.reporting.terminal import render_scan_result
+from puppetstring.reporting.terminal import render_scan_result, render_stage_status
 
 __all__ = [
     "UnravelEngine",
@@ -12,4 +12,5 @@ __all__ = [
     "render_json_report",
     "render_markdown_report",
     "render_scan_result",
+    "render_stage_status",
 ]
