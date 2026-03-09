@@ -113,3 +113,20 @@ SEVERITY_ORDER = {
     SEVERITY_LOW: 3,
     SEVERITY_INFO: 4,
 }
+
+# ── OWASP → Module coverage map ──────────────────────────────────
+# Which PuppetString modules test each OWASP category.
+# Used by DanceEngine / OWASPMapper to determine coverage gaps.
+
+OWASP_MODULE_COVERAGE_MAP: dict[str, list[str]] = {
+    "A1": ["scan"],  # Excessive Agency — MCP scanner checks permissions/tools
+    "A2": ["scan", "fuzz"],  # Uncontrolled Tool Execution — scanner + fuzzer
+    "A3": ["tangle"],  # Prompt Injection via Tools — tangle tests injection
+    "A4": ["fuzz"],  # Insecure Output Handling — fuzzer probes output chains
+    "A5": ["fuzz", "cut"],  # Memory & Context Manipulation — fuzzer + swarm memory attacks
+    "A6": [],  # Overreliance on Agent Outputs — organizational, not automatable
+    "A7": ["cut"],  # Multi-Agent Trust Exploitation — cut tests agent-to-agent
+    "A8": ["scan"],  # Identity & Access Mismanagement — scanner checks auth
+    "A9": ["scan"],  # Inadequate Logging & Monitoring — scanner checks config
+    "A10": ["scan"],  # Supply Chain Vulnerabilities — scanner checks server components
+}

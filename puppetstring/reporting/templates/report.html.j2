@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PuppetString Security Report</title>
+<style>
+:root {
+  --bg: #1a1a2e;
+  --bg-card: #16213e;
+  --bg-table: #0f3460;
+  --text: #e0e0e0;
+  --text-dim: #888;
+  --accent: #e94560;
+  --accent2: #0f3460;
+  --green: #4caf50;
+  --yellow: #ffc107;
+  --red: #f44336;
+  --orange: #ff9800;
+  --blue: #2196f3;
+  --border: #333;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  padding: 2rem;
+}
+h1, h2, h3 { margin-bottom: 0.5rem; }
+h1 { color: var(--accent); font-size: 1.8rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.5rem; }
+h2 { color: var(--text); font-size: 1.3rem; margin-top: 2rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+.header { text-align: center; margin-bottom: 2rem; }
+.header .subtitle { color: var(--text-dim); font-size: 0.9rem; }
+.meta { display: flex; gap: 2rem; flex-wrap: wrap; margin: 1rem 0; justify-content: center; }
+.meta-item { background: var(--bg-card); padding: 0.5rem 1rem; border-radius: 4px; font-size: 0.85rem; }
+.card { background: var(--bg-card); border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 1rem; margin: 1rem 0; }
+.stat { background: var(--bg-table); border-radius: 6px; padding: 1rem; text-align: center; }
+.stat .value { font-size: 2rem; font-weight: bold; }
+.stat .label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; }
+.stat.critical .value { color: var(--red); }
+.stat.high .value { color: var(--orange); }
+.stat.medium .value { color: var(--yellow); }
+.stat.low .value { color: var(--blue); }
+.stat.pass .value { color: var(--green); }
+table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+th, td { padding: 0.6rem 0.8rem; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg-table); font-weight: 600; font-size: 0.8rem; text-transform: uppercase; }
+td { font-size: 0.85rem; }
+.sev-critical { color: var(--red); font-weight: bold; }
+.sev-high { color: var(--orange); }
+.sev-medium { color: var(--yellow); }
+.sev-low { color: var(--blue); }
+.sev-info { color: var(--text-dim); }
+.status-pass { color: var(--green); }
+.status-fail { color: var(--red); font-weight: bold; }
+.status-not-tested { color: var(--text-dim); }
+.finding-detail { background: var(--bg-table); border-radius: 6px; padding: 1rem; margin: 0.5rem 0; border-left: 3px solid var(--border); }
+.finding-detail.critical { border-left-color: var(--red); }
+.finding-detail.high { border-left-color: var(--orange); }
+.finding-detail.medium { border-left-color: var(--yellow); }
+.finding-detail .field { margin: 0.3rem 0; }
+.finding-detail .field-label { font-weight: 600; font-size: 0.8rem; color: var(--text-dim); }
+details { margin: 0.5rem 0; }
+summary { cursor: pointer; color: var(--accent); font-size: 0.85rem; }
+pre { background: var(--bg); padding: 0.8rem; border-radius: 4px; overflow-x: auto; font-size: 0.8rem; margin: 0.3rem 0; }
+.footer { text-align: center; color: var(--text-dim); font-size: 0.75rem; margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>PuppetString Security Report</h1>
+  <p class="subtitle">
+    {% if company_name %}{{ company_name }} &mdash; {% endif %}OWASP Top 10 for Agentic AI Audit
+  </p>
+  <div class="meta">
+    <span class="meta-item">Target: {{ target }}</span>
+    <span class="meta-item">Framework: {{ framework }}</span>
+    <span class="meta-item">Date: {{ report_date }}</span>
+    {% if passive_only %}<span class="meta-item">Mode: Passive Only</span>{% endif %}
+  </div>
+</div>
+
+<h2>Executive Summary</h2>
+<div class="card">
+  <div class="stats">
+    <div class="stat {% if risk_score > 20 %}critical{% elif risk_score > 10 %}high{% elif risk_score > 0 %}medium{% else %}pass{% endif %}">
+      <div class="value">{{ "%.1f"|format(risk_score) }}</div>
+      <div class="label">Risk Score</div>
+    </div>
+    <div class="stat {% if coverage_pct < 50 %}high{% elif coverage_pct < 80 %}medium{% else %}pass{% endif %}">
+      <div class="value">{{ "%.0f"|format(coverage_pct) }}%</div>
+      <div class="label">Coverage</div>
+    </div>
+    <div class="stat">
+      <div class="value">{{ total_findings }}</div>
+      <div class="label">Total Findings</div>
+    </div>
+    <div class="stat critical">
+      <div class="value">{{ severity_counts.get('critical', 0) }}</div>
+      <div class="label">Critical</div>
+    </div>
+    <div class="stat high">
+      <div class="value">{{ severity_counts.get('high', 0) }}</div>
+      <div class="label">High</div>
+    </div>
+    <div class="stat medium">
+      <div class="value">{{ severity_counts.get('medium', 0) }}</div>
+      <div class="label">Medium</div>
+    </div>
+  </div>
+</div>
+
+<h2>OWASP Coverage Matrix</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Category</th>
+        <th>Status</th>
+        <th>Findings</th>
+        <th>Highest Sev</th>
+        <th>Tested By</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for cat in categories %}
+      <tr>
+        <td>{{ cat.owasp_id }}</td>
+        <td>{{ cat.name }}</td>
+        <td class="{% if cat.status == 'tested-pass' %}status-pass{% elif cat.status == 'tested-fail' %}status-fail{% else %}status-not-tested{% endif %}">
+          {% if cat.status == 'tested-pass' %}PASS{% elif cat.status == 'tested-fail' %}FAIL{% else %}NOT TESTED{% endif %}
+        </td>
+        <td>{{ cat.findings_count }}</td>
+        <td>
+          {% if cat.highest_severity %}
+          <span class="sev-{{ cat.highest_severity }}">{{ cat.highest_severity | upper }}</span>
+          {% else %}-{% endif %}
+        </td>
+        <td>{{ cat.tested_by | join(', ') if cat.tested_by else '-' }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if findings %}
+<h2>Findings ({{ findings | length }})</h2>
+<div class="card">
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Severity</th>
+        <th>Finding</th>
+        <th>OWASP</th>
+        <th>Module</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for f in findings %}
+      <tr>
+        <td>{{ loop.index }}</td>
+        <td><span class="sev-{{ f.severity }}">{{ f.severity | upper }}</span></td>
+        <td>{{ f.title }}</td>
+        <td>{{ f.owasp_ids | join(', ') }}</td>
+        <td>{{ f.source_module }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>Finding Details</h2>
+{% for f in findings %}
+<div class="finding-detail {{ f.severity }}">
+  <h3><span class="sev-{{ f.severity }}">{{ f.severity | upper }}</span> &mdash; {{ f.title }}</h3>
+  {% if f.description %}
+  <div class="field"><span class="field-label">Description:</span> {{ f.description }}</div>
+  {% endif %}
+  {% if f.owasp_ids %}
+  <div class="field"><span class="field-label">OWASP:</span> {{ f.owasp_ids | join(', ') }}</div>
+  {% endif %}
+  {% if f.source_module %}
+  <div class="field"><span class="field-label">Module:</span> {{ f.source_module }}</div>
+  {% endif %}
+  {% if f.evidence %}
+  <div class="field"><span class="field-label">Evidence:</span></div>
+  <pre>{{ f.evidence }}</pre>
+  {% endif %}
+  {% if f.remediation %}
+  <div class="field"><span class="field-label">Remediation:</span> {{ f.remediation }}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endif %}
+
+{% if include_transcripts and transcripts %}
+<h2>Transcripts</h2>
+{% for label, transcript in transcripts.items() %}
+<details>
+  <summary>{{ label }}</summary>
+  <pre>{{ transcript }}</pre>
+</details>
+{% endfor %}
+{% endif %}
+
+<div class="footer">
+  Generated by PuppetString v{{ version }} &mdash; {{ report_date }}<br>
+  OWASP Top 10 for Agentic AI Applications (2026)
+</div>
+</body>
+</html>

@@ -36,8 +36,18 @@ EXPECTED_MODULES = [
     "puppetstring.modules.prompt_injection.models",
     "puppetstring.modules.prompt_injection.payload_loader",
     "puppetstring.modules.prompt_injection.payload_generator",
+    "puppetstring.modules.owasp_audit",
+    "puppetstring.modules.owasp_audit.models",
+    "puppetstring.modules.owasp_audit.engine",
+    "puppetstring.modules.owasp_audit.mapper",
+    "puppetstring.modules.owasp_audit.serializer",
     "puppetstring.payloads.loader",
     "puppetstring.reporting.terminal",
+    "puppetstring.reporting.remediation",
+    "puppetstring.reporting.html_reporter",
+    "puppetstring.reporting.json_reporter",
+    "puppetstring.reporting.markdown_reporter",
+    "puppetstring.reporting.report_generator",
     "puppetstring.utils.logging",
     "puppetstring.utils.constants",
 ]
@@ -165,3 +175,33 @@ class TestModuleImports:
 
     def test_import_utils_constants(self) -> None:
         self._import("puppetstring.utils.constants")
+
+    def test_import_owasp_audit(self) -> None:
+        self._import("puppetstring.modules.owasp_audit")
+
+    def test_import_owasp_models(self) -> None:
+        self._import("puppetstring.modules.owasp_audit.models")
+
+    def test_import_owasp_engine(self) -> None:
+        self._import("puppetstring.modules.owasp_audit.engine")
+
+    def test_import_owasp_mapper(self) -> None:
+        self._import("puppetstring.modules.owasp_audit.mapper")
+
+    def test_import_owasp_serializer(self) -> None:
+        self._import("puppetstring.modules.owasp_audit.serializer")
+
+    def test_import_remediation(self) -> None:
+        self._import("puppetstring.reporting.remediation")
+
+    def test_import_html_reporter(self) -> None:
+        self._import("puppetstring.reporting.html_reporter")
+
+    def test_import_json_reporter(self) -> None:
+        self._import("puppetstring.reporting.json_reporter")
+
+    def test_import_markdown_reporter(self) -> None:
+        self._import("puppetstring.reporting.markdown_reporter")
+
+    def test_import_report_generator(self) -> None:
+        self._import("puppetstring.reporting.report_generator")

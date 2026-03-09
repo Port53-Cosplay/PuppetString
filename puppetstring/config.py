@@ -203,6 +203,27 @@ class ReportConfig(BaseModel):
     )
 
 
+class DanceConfig(BaseModel):
+    """Settings for the `dance` command (OWASP audit orchestration)."""
+
+    run_scan: bool = Field(default=True, description="Run MCP scanning module")
+    run_fuzz: bool = Field(default=True, description="Run workflow fuzzing module")
+    run_tangle: bool = Field(default=True, description="Run prompt injection module")
+    run_cut: bool = Field(default=True, description="Run agent-to-agent module")
+    auto_report: bool = Field(
+        default=False,
+        description="Automatically generate a report after the audit completes",
+    )
+    results_dir: str = Field(
+        default="./puppetstring_results",
+        description="Directory for storing audit result files",
+    )
+    timeout_per_module: int = Field(
+        default=600,
+        description="Maximum seconds to spend per sub-module",
+    )
+
+
 class PuppetStringConfig(BaseModel):
     """Root configuration model — contains all sections."""
 
@@ -212,6 +233,7 @@ class PuppetStringConfig(BaseModel):
     inject: InjectConfig = Field(default_factory=InjectConfig)
     cut: CutConfig = Field(default_factory=CutConfig)
     report: ReportConfig = Field(default_factory=ReportConfig)
+    dance: DanceConfig = Field(default_factory=DanceConfig)
 
 
 # ── Config loading ────────────────────────────────────────────────

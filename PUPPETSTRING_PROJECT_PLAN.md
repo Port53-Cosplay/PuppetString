@@ -172,13 +172,13 @@
 - Fixed 2 real bugs found by tests:
   - Separator encoding delimiter conflicted with data characters (removed delimiter, each byte is always exactly 4 chars)
   - `_vector_to_categories("nonexistent")` returned None (loaded all payloads instead of none) — fixed to return `[]`
-- Migrated project from Y: drive (network share) to C:\Users\lurka\Projects\PuppetString (local drive):
-  - Re-pointed editable install to C: drive
-  - Synced all files to C: (Y: had some files, C: had others — consolidated)
+- Migrated project from network share to local drive:
+  - Re-pointed editable install to local drive
+  - Synced all files (network share had some files, local had others — consolidated)
   - Created `.claude/local_env.md` (gitignored) for machine-specific paths
   - Updated CLAUDE.md to reference local_env.md after compaction
-  - Updated docs/DEV_SETUP.md to remove Y: drive references
-  - Y: drive copy is now fully defunct
+  - Updated docs/DEV_SETUP.md to remove old drive references
+  - Network share copy is now fully defunct
 - Built environment safeguards after the broken pip install incident:
   - `scripts/health_check.py`: verifies venv, editable install location, all module imports, CLI entry point
   - `tests/test_smoke.py`: 25 pytest tests that catch import/wiring failures automatically
@@ -194,9 +194,8 @@
 - Machine-specific paths go in `.claude/local_env.md` (gitignored), not CLAUDE.md (committed)
 
 **Environment notes:**
-- Project root is now C:\Users\lurka\Projects\PuppetString (NOT Y: drive)
-- Y:\DeAnna\PuppetString is DEFUNCT — safe to delete
-- Claude Code should be launched from C:\Users\lurka\Projects\PuppetString
+- Project migrated to local drive (see `.claude/local_env.md` for machine-specific paths)
+- Network share copy is defunct
 
 **Next session — pick up with:**
 - Improve payload sophistication: replace obvious "ignore previous instructions" with realistic attacker techniques (authority impersonation, task wrapping, subtle goal manipulation)
@@ -280,9 +279,45 @@
 - Rogue agent runner handles complex multi-step attacks: inject → optional memory poison → attack via message OR delegation → cleanup
 
 **Next session — pick up with:**
-- Phase 5: OWASP Audit & Reports (`puppetstring dance` + `puppetstring unravel`)
-- Commit and push all Phase 4 work
+- Phase 6: Polish & Launch
 - Create GitHub profile README (Port53-Cosplay/Port53-Cosplay repo)
+
+### Session 10 (3/8/2026) — Phase 5 Complete
+
+Implemented the full OWASP Audit (`dance`) and Report Generation (`unravel`) layer:
+
+**New modules (16 files):**
+- `puppetstring/modules/owasp_audit/models.py` — `OWASPTestStatus`, `UnifiedFinding`, `OWASPCoverage`, `DanceRunResult`, `ResultManifest`
+- `puppetstring/modules/owasp_audit/engine.py` — `DanceEngine` orchestrates scan→fuzz→tangle→cut sequentially
+- `puppetstring/modules/owasp_audit/mapper.py` — `OWASPMapper` maps findings to A1–A10 coverage matrix
+- `puppetstring/modules/owasp_audit/serializer.py` — `ResultSerializer` saves/loads results as JSON files on disk
+- `puppetstring/reporting/remediation.py` — `RemediationGenerator` with LLM-powered fixes + template fallback for all A1–A10
+- `puppetstring/reporting/html_reporter.py` — Self-contained dark-themed HTML report with inline CSS
+- `puppetstring/reporting/json_reporter.py` — CI-friendly JSON with `exit_code` field (0=pass, 1=critical/high)
+- `puppetstring/reporting/markdown_reporter.py` — Markdown report renderer
+- `puppetstring/reporting/report_generator.py` — `UnravelEngine` orchestrator for the `unravel` command
+- `puppetstring/reporting/templates/report.html.j2` — Jinja2 HTML template with OWASP heatmap, findings table, executive summary
+- `puppetstring/reporting/templates/report.md.j2` — Jinja2 Markdown template
+- 5 test files: `test_owasp_mapper.py` (15), `test_serializer.py` (10), `test_remediation.py` (17), `test_unravel.py` (12), `test_dance.py` (10)
+
+**Modified files (7):**
+- `config.py` — added `DanceConfig` (module toggles, results_dir, timeout_per_module)
+- `constants.py` — added `OWASP_MODULE_COVERAGE_MAP` (A1–A10 → which modules test each)
+- `cli.py` — wired `dance` and `unravel` commands to their engines
+- `terminal.py` — added `render_dance_result()` with OWASP coverage heatmap table
+- `modules/owasp_audit/__init__.py` — exports
+- `reporting/__init__.py` — exports new renderers + `UnravelEngine`
+- `tests/test_smoke.py` + `tests/conftest.py` — 10 new smoke tests + dance fixtures
+
+**Design decisions:**
+- Direct engine invocation — `dance` imports sub-module engines directly (no subprocess shell-out)
+- Results on disk as JSON — each sub-result saved separately via Pydantic `model_dump_json()`, `manifest.json` tracks what's present
+- `--passive-only` mode loads existing results (or produces empty coverage gap report)
+- Self-contained HTML — all CSS inline, no external assets, XSS-safe via Jinja2 `autoescape=True`
+- Remediation fallback — LLM via LiteLLM with pre-written templates per OWASP category when no API key
+- Target URL scheme determines which modules run (mcp:// → scan, http:// → fuzz/tangle)
+
+**Test results:** 486 passed, 6 skipped, 0 failures (69 new tests)
 
 ---
 
@@ -1395,14 +1430,18 @@ company_name = ""
 
 **Goal:** `puppetstring dance` runs a full OWASP coverage audit with professional reports.
 
-- [ ] Implement `dance` orchestrator (runs relevant tests from `pull`, `tangle`, `cut`)
-- [ ] Build OWASP coverage mapper
-- [ ] Implement HTML report template (professional, with executive summary)
-- [ ] Implement JSON report (for CI/CD integration)
-- [ ] Implement Markdown report
-- [ ] Add remediation suggestions (LLM-generated per finding)
-- [ ] GitHub Actions integration (run PuppetString as a CI check)
-- [ ] Write comprehensive docs
+- [x] Implement `dance` orchestrator (`DanceEngine` — runs scan/fuzz/tangle/cut sequentially, each in try/except)
+- [x] Build OWASP coverage mapper (`OWASPMapper` — maps findings to A1–A10 matrix with severity breakdown)
+- [x] Implement result serializer (save/load JSON files to disk with `manifest.json`)
+- [x] Implement HTML report template (self-contained dark theme, inline CSS, OWASP heatmap, XSS-safe)
+- [x] Implement JSON report (CI-friendly with `exit_code` field for GitHub Actions)
+- [x] Implement Markdown report
+- [x] Add remediation suggestions (`RemediationGenerator` — LLM-powered with template fallback for all A1–A10)
+- [x] Implement `--passive-only` mode (loads existing results, produces coverage gap report)
+- [x] Wire `dance` and `unravel` CLI commands
+- [x] Terminal reporter with OWASP coverage heatmap table
+- [x] Write tests (64 new tests: mapper, serializer, remediation, unravel, dance)
+- [ ] GitHub Actions integration example (documentation — deferred to Phase 6)
 
 **Definition of done:** Run `puppetstring dance --target mcp://localhost:3000 --framework owasp-agentic-2026` and get a beautiful HTML report via `puppetstring unravel` with coverage heatmap, finding details, and remediation guidance.
 

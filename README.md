@@ -82,7 +82,7 @@ puppetstring unravel -r ./puppetstring_results -f html
 
 ## Project Status
 
-**Current Phase:** Phase 0 — Scaffolding complete, CLI working, tests passing.
+**Current Phase:** Phase 5 complete — All core modules implemented (MCP scanning, workflow fuzzing, prompt injection, agent-to-agent attacks, OWASP audit orchestration, HTML/JSON/Markdown report generation). 486 tests passing.
 
 See [PUPPETSTRING_PROJECT_PLAN.md](PUPPETSTRING_PROJECT_PLAN.md) for the full roadmap.
 

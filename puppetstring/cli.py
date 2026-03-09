@@ -513,7 +513,33 @@ def dance(
     console.print(f"[bold]Framework:[/bold] {framework}")
     if passive_only:
         console.print("[bold]Mode:[/bold] Passive only (no active testing)")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 5.[/yellow]")
+
+    from puppetstring.config import load_config  # noqa: PLC0415
+    from puppetstring.modules.owasp_audit.engine import DanceEngine  # noqa: PLC0415
+    from puppetstring.reporting.terminal import render_dance_result  # noqa: PLC0415
+    from puppetstring.utils.logging import setup_logging  # noqa: PLC0415
+
+    setup_logging(verbose=False)
+    config = load_config()
+
+    engine = DanceEngine(target=target, config=config)
+
+    try:
+        result = asyncio.run(engine.run(passive_only=passive_only))
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Audit interrupted by user.[/yellow]")
+        raise typer.Exit(code=1) from None
+
+    if output == "terminal":
+        render_dance_result(result)
+    else:
+        console.print(
+            f"\n[yellow]Output format '{output}' not implemented yet. "
+            "Use 'unravel' for reports.[/yellow]"
+        )
+
+    if result.has_critical_or_high:
+        raise typer.Exit(code=1)
 
 
 @app.command()
@@ -557,7 +583,43 @@ def unravel(
     console.print(f"\n[bold]Results:[/bold] {results_dir}")
     console.print(f"[bold]Format:[/bold] {output_format}")
     console.print(f"[bold]Output:[/bold] {output_dir}")
-    console.print("\n[yellow]Not implemented yet — coming in Phase 5.[/yellow]")
+
+    valid_formats = {"html", "json", "markdown"}
+    if output_format not in valid_formats:
+        console.print(
+            f"\n[bold red]Unknown format:[/bold red] '{output_format}'\n"
+            f"[bold]Valid formats:[/bold] {', '.join(sorted(valid_formats))}"
+        )
+        raise typer.Exit(code=1)
+
+    from puppetstring.config import load_config  # noqa: PLC0415
+    from puppetstring.reporting.report_generator import UnravelEngine  # noqa: PLC0415
+    from puppetstring.utils.logging import setup_logging  # noqa: PLC0415
+
+    setup_logging(verbose=False)
+    config = load_config()
+
+    # Override transcript setting from CLI
+    config.report.include_full_transcripts = include_transcripts
+
+    engine = UnravelEngine(config=config)
+
+    try:
+        report_path = asyncio.run(
+            engine.run(
+                results_dir=results_dir,
+                output_format=output_format,
+                output_dir=output_dir,
+                include_transcripts=include_transcripts,
+            )
+        )
+        console.print(f"\n[bold green]Report generated:[/bold green] {report_path}")
+    except FileNotFoundError as exc:
+        console.print(f"\n[bold red]Error:[/bold red] {exc}")
+        raise typer.Exit(code=1) from None
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Report generation interrupted.[/yellow]")
+        raise typer.Exit(code=1) from None
 
 
 @app.command()

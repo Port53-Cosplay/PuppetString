@@ -28,6 +28,13 @@ from puppetstring.modules.agent_swarm.models import (
     SwarmResult,
     SwarmRunResult,
 )
+from puppetstring.modules.owasp_audit.models import (
+    DanceRunResult,
+    OWASPCoverage,
+    OWASPCoverageItem,
+    OWASPTestStatus,
+    UnifiedFinding,
+)
 from puppetstring.modules.prompt_injection.models import (
     InjectionClassification,
     InjectionPayload,
@@ -207,3 +214,62 @@ def swarm_run_result(sample_agent_info_list: list[AgentInfo]) -> SwarmRunResult:
         ),
     ]
     return result
+
+
+# ── Dance (OWASP audit) fixtures ─────────────────────────────────
+
+
+@pytest.fixture
+def sample_unified_finding() -> UnifiedFinding:
+    """A single unified finding for testing."""
+    return UnifiedFinding(
+        title="Test Finding",
+        severity=Severity.HIGH,
+        owasp_ids=["A3"],
+        source_module="tangle",
+        description="Test injection succeeded",
+        evidence="Canary word found in response",
+    )
+
+
+@pytest.fixture
+def owasp_coverage() -> OWASPCoverage:
+    """An OWASPCoverage with mixed statuses."""
+    return OWASPCoverage(
+        categories=[
+            OWASPCoverageItem(
+                owasp_id="A1",
+                name="Excessive Agency",
+                status=OWASPTestStatus.TESTED_PASS,
+                tested_by=["scan"],
+            ),
+            OWASPCoverageItem(
+                owasp_id="A3",
+                name="Prompt Injection via Tools",
+                status=OWASPTestStatus.TESTED_FAIL,
+                findings_count=2,
+                highest_severity=Severity.HIGH,
+                tested_by=["tangle"],
+            ),
+        ],
+        coverage_percentage=20.0,
+        total_findings=2,
+        risk_score=10.0,
+    )
+
+
+@pytest.fixture
+def dance_run_result(
+    scan_result: ScanResult,
+    tangle_run_result: TangleRunResult,
+    owasp_coverage: OWASPCoverage,
+    sample_unified_finding: UnifiedFinding,
+) -> DanceRunResult:
+    """A DanceRunResult with mixed sub-results for testing."""
+    return DanceRunResult(
+        target="http://localhost:8000",
+        scan_result=scan_result,
+        tangle_result=tangle_run_result,
+        coverage=owasp_coverage,
+        all_findings=[sample_unified_finding],
+    )

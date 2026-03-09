@@ -25,6 +25,10 @@ from puppetstring.modules.agent_swarm.models import (
     SwarmClassification,
     SwarmRunResult,
 )
+from puppetstring.modules.owasp_audit.models import (
+    DanceRunResult,
+    OWASPTestStatus,
+)
 from puppetstring.modules.prompt_injection.models import (
     InjectionClassification,
     TangleRunResult,
@@ -760,6 +764,161 @@ def _render_cut_summary(result: SwarmRunResult) -> None:
             "\n".join(summary_lines),
             title="[bold]Cut Summary[/bold]",
             border_style="red" if has_exploits else "green",
+            expand=False,
+        )
+    )
+    console.print()
+
+
+# ── Dance (OWASP audit) result rendering ────────────────────────
+
+_STATUS_STYLES: dict[str, str] = {
+    "tested-pass": "green",
+    "tested-fail": "bold red",
+    "not-tested": "dim",
+}
+
+_STATUS_LABELS: dict[str, str] = {
+    "tested-pass": "PASS",
+    "tested-fail": "FAIL",
+    "not-tested": "NOT TESTED",
+}
+
+
+def render_dance_result(result: DanceRunResult) -> None:
+    """Print a full OWASP audit report to the terminal."""
+    _render_dance_header(result)
+
+    if result.errors:
+        for module, err in result.errors.items():
+            console.print(f"  [yellow]Warning ({module}):[/yellow] {err}")
+
+    _render_owasp_heatmap(result)
+
+    if result.all_findings:
+        _render_dance_findings(result)
+
+    _render_dance_summary(result)
+
+
+def _render_dance_header(result: DanceRunResult) -> None:
+    """Print the dance header panel."""
+    console.print()
+    lines = [
+        f"[bold]Target:[/bold] {result.target}",
+        f"[bold]Framework:[/bold] {result.framework}",
+        f"[bold]Mode:[/bold] {'Passive' if result.passive_only else 'Active'}",
+        f"[bold]Started:[/bold] {result.started_at:%Y-%m-%d %H:%M:%S}",
+    ]
+    console.print(
+        Panel(
+            "\n".join(lines),
+            title="[bold magenta]PuppetString — Making it dance...[/bold magenta]",
+            border_style="magenta",
+            expand=False,
+        )
+    )
+
+
+def _render_owasp_heatmap(result: DanceRunResult) -> None:
+    """Print the OWASP Top 10 coverage heatmap table."""
+    table = Table(
+        title="\n[bold]OWASP Top 10 Coverage Matrix[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("ID", width=4)
+    table.add_column("Category", max_width=40)
+    table.add_column("Status", width=12)
+    table.add_column("Findings", width=9, justify="center")
+    table.add_column("Highest", width=10)
+    table.add_column("Tested By", max_width=25)
+
+    for cat in result.coverage.categories:
+        status_style = _STATUS_STYLES.get(cat.status.value, "dim")
+        status_label = _STATUS_LABELS.get(cat.status.value, cat.status.value)
+
+        if cat.highest_severity:
+            sev_style = _SEVERITY_STYLES.get(cat.highest_severity.value, "")
+            highest = Text(cat.highest_severity.value.upper(), style=sev_style)
+        else:
+            highest = Text("-", style="dim")
+
+        table.add_row(
+            cat.owasp_id,
+            cat.name,
+            Text(status_label, style=status_style),
+            str(cat.findings_count),
+            highest,
+            ", ".join(cat.tested_by) if cat.tested_by else "-",
+        )
+
+    console.print(table)
+
+
+def _render_dance_findings(result: DanceRunResult) -> None:
+    """Print the top findings from the audit."""
+    table = Table(
+        title=f"\n[bold]Top Findings ({len(result.all_findings)})[/bold]",
+        show_header=True,
+        header_style="bold cyan",
+        expand=False,
+    )
+    table.add_column("#", style="dim", width=3)
+    table.add_column("Severity", width=10)
+    table.add_column("Finding", max_width=40)
+    table.add_column("OWASP", width=10)
+    table.add_column("Module", width=8)
+
+    for i, f in enumerate(result.sorted_findings[:20], 1):
+        sev_style = _SEVERITY_STYLES.get(f.severity.value, "")
+        owasp = ", ".join(f.owasp_ids) if f.owasp_ids else "-"
+
+        table.add_row(
+            str(i),
+            Text(f.severity.value.upper(), style=sev_style),
+            f.title,
+            owasp,
+            f.source_module,
+        )
+
+    console.print(table)
+
+    if len(result.all_findings) > 20:
+        console.print(f"  [dim]... and {len(result.all_findings) - 20} more findings[/dim]")
+
+
+def _render_dance_summary(result: DanceRunResult) -> None:
+    """Print the OWASP audit summary panel."""
+    sev = result.severity_summary
+    coverage = result.coverage
+
+    tested = sum(1 for c in coverage.categories if c.status != OWASPTestStatus.NOT_TESTED)
+    total_cats = len(coverage.categories) if coverage.categories else 10
+
+    summary_lines = [
+        f"[bold]Risk Score:[/bold] {coverage.risk_score:.1f}",
+        f"[bold]OWASP Coverage:[/bold] {tested}/{total_cats} categories "
+        f"({coverage.coverage_percentage:.0f}%)",
+        f"[bold]Total Findings:[/bold] {coverage.total_findings}",
+        "",
+        f"  [bold red]Critical:[/bold red] {sev.get('critical', 0)}",
+        f"  [red]High:[/red] {sev.get('high', 0)}",
+        f"  [yellow]Medium:[/yellow] {sev.get('medium', 0)}",
+        f"  [blue]Low:[/blue] {sev.get('low', 0)}",
+        f"  [dim]Info:[/dim] {sev.get('info', 0)}",
+        "",
+        f"[bold]Duration:[/bold] {result.duration_seconds:.1f}s",
+    ]
+
+    has_critical = sev.get("critical", 0) > 0
+    console.print()
+    console.print(
+        Panel(
+            "\n".join(summary_lines),
+            title="[bold]OWASP Audit Summary[/bold]",
+            border_style="red" if has_critical else "green",
             expand=False,
         )
     )
